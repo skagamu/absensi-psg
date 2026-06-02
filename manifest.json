@@ -1,0 +1,21 @@
+{
+  "name": "Absensi PSG SMKGAMU",
+  "short_name": "Absen PSG",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F1F5F9",
+  "theme_color": "#1E3A8A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

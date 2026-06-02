@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Absensi PSG SMKGAMU</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1E3A8A">
+    <link rel="apple-touch-icon" href="./icon.png">
+    <link rel="icon" type="image/png" href="./icon.png">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { primary: '#1E3A8A' },
+                    animation: {
+                        'slideUp': 'slideUp 0.3s ease-out forwards',
+                        'fadeIn': 'fadeIn 0.2s ease-out forwards'
+                    },
+                    keyframes: {
+                        slideUp: { 'from': { opacity: '0', transform: 'translateY(15px)' }, 'to': { opacity: '1', transform: 'translateY(0)' } },
+                        fadeIn: { 'from': { opacity: '0' }, 'to': { opacity: '1' } }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F1F5F9; }
+        .camera-box { aspect-ratio: 3/4; }
+        #toast { transition: bottom 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        #toast.show { bottom: 20px; }
+        .spinner { border-top-color: transparent; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { display: none; }
+        
+        .tab-btn.active { color: #1E3A8A; border-bottom: 2px solid #1E3A8A; font-weight: 600; }
+        .tab-btn { color: #64748B; border-bottom: 2px solid transparent; font-weight: 500; }
+
+        @media print {
+            body { background: white !important; }
+            body * { visibility: hidden; }
+            #mainApp, #mainApp * { visibility: visible; color: black !important; }
+            #mainApp { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; border: none !important; margin: 0; padding: 0; }
+            header, nav, #btnExportPdf, .no-print, input, select { display: none !important; }
+            .overflow-x-auto { overflow: visible !important; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex items-center justify-center relative overflow-hidden antialiased">
+
+    <div id="mainContainer" class="w-full max-w-[500px] h-[100dvh] md:h-[90vh] md:rounded-[1.5rem] flex flex-col relative z-10 overflow-hidden bg-slate-50 md:shadow-xl md:border md:border-slate-200">
+        
+        <!-- HEADER -->
+        <header class="bg-white px-5 py-4 flex justify-between items-center shadow-sm z-20 shrink-0">
+            <div class="flex items-center gap-3 text-primary font-bold text-xl tracking-tight">
+                <img src="./icon.png" class="w-8 h-8 rounded-lg shadow-sm" alt="Logo">
+                <h1 class="text-slate-800">Absen<span class="text-primary">PSG</span></h1>
+            </div>
+            
+            <div id="userProfile" class="hidden relative items-center gap-2">
+                <button id="btnProfileMenu" class="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-200 hover:bg-slate-100 transition-all focus:outline-none flex gap-2 items-center px-3">
+                    <i class="ph ph-user text-lg"></i>
+                    <span id="displayNisn" class="text-sm font-bold truncate max-w-[80px]"></span>
+                </button>
+                <div id="dropdownMenu" class="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg hidden z-[60]">
+                    <div class="p-3 border-b border-slate-100">
+                        <p class="text-xs text-slate-500">Masuk sebagai</p>
+                        <p id="displayNamaLengkap" class="font-bold text-slate-800 truncate"></p>
+                    </div>
+                    <div class="p-2">
+                        <button id="btnLogout" class="w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2 transition-all font-semibold">
+                            <i class="ph ph-sign-out text-lg"></i> Keluar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto relative flex flex-col">
+            <!-- LOGIN SECTION -->
+            <section id="loginSection" class="p-6 flex flex-col justify-center flex-1 animate-slideUp">
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col gap-5">
+                    <div class="text-center mb-2">
+                        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Login Siswa</h2>
+                        <p class="text-slate-500 text-sm mt-1">Masukkan NISN & Tanggal Lahir.</p>
+                    </div>
+                    <div class="relative flex items-center">
+                        <i class="ph ph-identification-card absolute left-4 text-slate-400 text-xl"></i>
+                        <input type="number" id="inputNisn" placeholder="Nomor Induk Siswa Nasional" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-3.5 pl-12 pr-4 outline-none focus:border-primary focus:bg-white transition-all font-medium">
+                    </div>
+                    <div class="relative flex flex-col">
+                        <label class="text-xs font-semibold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Tanggal Lahir</label>
+                        <div class="relative flex items-center">
+                            <i class="ph ph-calendar-blank absolute left-4 text-slate-400 text-xl"></i>
+                            <input type="date" id="inputTglLahir" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-3.5 pl-12 pr-4 outline-none focus:border-primary focus:bg-white transition-all font-medium">
+                        </div>
+                    </div>
+                    <button id="btnLanjut" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2">
+                        Masuk <i class="ph ph-arrow-right font-bold"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- MAIN APP AREA -->
+            <div id="mainApp" class="hidden flex-col h-full">
+                <!-- TABS -->
+                <nav class="bg-white border-b border-slate-200 flex px-2 pt-2 shrink-0 overflow-x-auto no-scrollbar">
+                    <button class="tab-btn active px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="dashboard">
+                        <i class="ph ph-squares-four text-lg"></i> Dashboard
+                    </button>
+                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="absen">
+                        <i class="ph ph-camera text-lg"></i> Isi Kehadiran
+                    </button>
+                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="rekap">
+                        <i class="ph ph-clock-counter-clockwise text-lg"></i> Riwayat
+                    </button>
+                </nav>
+
+                <!-- TAB CONTENTS -->
+                <div class="flex-1 overflow-y-auto p-4 md:p-5 relative bg-slate-50/50">
+                    
+                    <!-- LOADING OVERLAY -->
+                    <div id="loadingOverlay" class="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 hidden">
+                        <div class="spinner w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full"></div>
+                        <p class="text-sm font-medium text-slate-500">Memuat Data...</p>
+                    </div>
+
+                    <!-- TAB: DASHBOARD -->
+                    <div id="tab-dashboard" class="tab-content animate-fadeIn space-y-5 hidden flex-col">
+                        <div class="bg-gradient-to-br from-primary to-blue-700 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden">
+                            <div class="absolute -right-4 -top-4 opacity-10">
+                                <i class="ph-fill ph-student text-9xl"></i>
+                            </div>
+                            <p class="text-blue-100 text-sm font-medium mb-1">Halo, selamat datang!</p>
+                            <h2 id="dashNamaSiswa" class="text-2xl font-bold line-clamp-1">Nama Siswa</h2>
+                        </div>
+
+                        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex justify-between items-center">
+                            <div>
+                                <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Status Hari Ini</p>
+                                <p id="dashStatusHariIni" class="text-lg font-bold text-slate-800">Mengecek...</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                                <i class="ph-fill ph-calendar-check text-2xl"></i>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-3">
+                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Statistik Anda</h3>
+                                <select id="dashBulanFilter" class="bg-transparent border-none text-xs font-bold text-primary outline-none cursor-pointer">
+                                    <option value="all">Semua Waktu</option>
+                                    <option value="1">Januari</option>
+                                    <option value="2">Februari</option>
+                                    <option value="3">Maret</option>
+                                    <option value="4">April</option>
+                                    <option value="5">Mei</option>
+                                    <option value="6">Juni</option>
+                                    <option value="7">Juli</option>
+                                    <option value="8">Agustus</option>
+                                    <option value="9">September</option>
+                                    <option value="10">Oktober</option>
+                                    <option value="11">November</option>
+                                    <option value="12">Desember</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm flex flex-col">
+                                    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><p class="text-xs font-semibold text-slate-500">Hadir</p></div>
+                                    <p id="dashH" class="text-2xl font-bold text-emerald-600">0</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-2xl border border-rose-100 shadow-sm flex flex-col">
+                                    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-rose-500"></div><p class="text-xs font-semibold text-slate-500">Sakit</p></div>
+                                    <p id="dashS" class="text-2xl font-bold text-rose-600">0</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-2xl border border-amber-100 shadow-sm flex flex-col">
+                                    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-amber-500"></div><p class="text-xs font-semibold text-slate-500">Izin</p></div>
+                                    <p id="dashI" class="text-2xl font-bold text-amber-600">0</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                                    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-slate-400"></div><p class="text-xs font-semibold text-slate-500">Alpha</p></div>
+                                    <p id="dashA" class="text-2xl font-bold text-slate-600">0</p>
+                                </div>
+                            </div>
+                            <div class="mt-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors" onclick="document.querySelector('[data-target=rekap]').click()">
+                                <p class="text-sm font-semibold text-primary flex items-center gap-1">Lihat Detail Riwayat <i class="ph ph-arrow-right"></i></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: ABSEN (KAMERA & LOKASI) -->
+                    <div id="tab-absen" class="tab-content animate-fadeIn space-y-4 hidden flex-col">
+                        <!-- CAMERA BOX -->
+                        <div class="camera-box bg-slate-200 rounded-3xl overflow-hidden relative shadow-inner border-2 border-white">
+                            <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
+                            <img id="photo" class="hidden w-full h-full object-cover">
+                            <canvas id="canvas" class="hidden"></canvas>
+                            
+                            <div id="cameraStatus" class="absolute inset-0 flex items-center justify-center bg-slate-800/80 backdrop-blur-sm z-10 text-white flex-col gap-2 p-4 text-center">
+                                <div class="spinner w-8 h-8 border-4 border-slate-400 border-t-white rounded-full"></div>
+                                <p class="font-medium text-sm">Menyiapkan Kamera & Lokasi GPS...</p>
+                            </div>
+                            
+                            <!-- Location Badge -->
+                            <div class="absolute top-3 left-3 right-3 flex justify-center z-10 pointer-events-none">
+                                <div class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 max-w-full">
+                                    <div id="locDot" class="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></div>
+                                    <span id="locText" class="text-white text-xs font-medium tracking-wide truncate">Mencari Satelit...</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Capture Button overlay -->
+                            <div class="absolute bottom-5 left-0 right-0 flex justify-center gap-4 z-20">
+                                <button id="btnCapture" disabled class="w-16 h-16 bg-white/30 backdrop-blur-md rounded-full border-4 border-white flex items-center justify-center shadow-lg transition-transform active:scale-90 opacity-50">
+                                    <div class="w-12 h-12 bg-white rounded-full"></div>
+                                </button>
+                                <button id="btnRetake" class="hidden w-16 h-16 bg-rose-500 text-white rounded-full border-4 border-rose-300 flex items-center justify-center shadow-lg transition-transform active:scale-90">
+                                    <i class="ph ph-arrows-clockwise text-2xl font-bold"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- FORM ABSEN -->
+                        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 flex flex-col gap-4">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Keterangan Kehadiran</label>
+                                <select id="inputStatus" class="w-full bg-slate-50 border border-slate-200 text-slate-800 font-semibold text-sm rounded-xl px-4 py-3.5 outline-none focus:border-primary focus:bg-white transition-all appearance-none cursor-pointer">
+                                    <option value="Hadir">✔️ Hadir (H)</option>
+                                    <option value="Izin">ℹ️ Izin (I)</option>
+                                    <option value="Sakit">🤒 Sakit (S)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="flex flex-col gap-1.5 hidden" id="boxAlasan">
+                                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Surat / Alasan Tambahan</label>
+                                <textarea id="inputAlasan" placeholder="Tulis alasan izin/sakit..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-20"></textarea>
+                            </div>
+
+                            <button id="btnSubmit" disabled class="w-full bg-slate-300 text-slate-500 font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all mt-2">
+                                Silakan Ambil Foto <i class="ph ph-camera text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: REKAP RIWAYAT -->
+                    <div id="tab-rekap" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
+                        <div class="flex gap-2 shrink-0 no-print">
+                            <select id="bulanRekap" class="flex-1 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm cursor-pointer">
+                                <option value="all">Semua Bulan</option>
+                                <option value="1">Januari</option>
+                                <option value="2">Februari</option>
+                                <option value="3">Maret</option>
+                                <option value="4">April</option>
+                                <option value="5">Mei</option>
+                                <option value="6">Juni</option>
+                                <option value="7">Juli</option>
+                                <option value="8">Agustus</option>
+                                <option value="9">September</option>
+                                <option value="10">Oktober</option>
+                                <option value="11">November</option>
+                                <option value="12">Desember</option>
+                            </select>
+                            <button id="btnExportPdf" class="bg-primary text-white p-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5 text-sm font-semibold hover:bg-blue-900 transition-colors" title="Cetak PDF">
+                                <i class="ph ph-printer text-lg"></i>
+                            </button>
+                        </div>
+                        <div id="rekapContainer" class="flex-1 pb-4 flex flex-col gap-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed -bottom-24 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-5 py-3 rounded-xl font-semibold shadow-xl z-[100] whitespace-nowrap flex items-center gap-2 text-sm border border-slate-700">
+        <i class="ph-fill ph-info text-lg text-blue-400"></i>
+        <span id="toastMsg">Notifikasi</span>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js');
+            });
+        }
+        
+        window.showToast = function(message, type = "success") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const icon = toast.querySelector('i');
+            toastMsg.innerText = message;
+            if (type === "error") {
+                toast.className = "fixed -bottom-24 left-1/2 -translate-x-1/2 bg-rose-50 text-rose-700 px-5 py-3 rounded-xl font-semibold shadow-lg z-[100] whitespace-nowrap flex items-center gap-2 transition-all duration-300 text-sm border border-rose-200";
+                icon.className = "ph-fill ph-warning-circle text-lg text-rose-500";
+            } else {
+                toast.className = "fixed -bottom-24 left-1/2 -translate-x-1/2 bg-emerald-50 text-emerald-700 px-5 py-3 rounded-xl font-semibold shadow-lg z-[100] whitespace-nowrap flex items-center gap-2 transition-all duration-300 text-sm border border-emerald-200";
+                icon.className = "ph-fill ph-check-circle text-lg text-emerald-500";
+            }
+            setTimeout(() => { toast.classList.add('!bottom-8'); }, 10);
+            setTimeout(() => { toast.classList.remove('!bottom-8'); }, 3000);
+        }
+    </script>
+</body>
+</html>
