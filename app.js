@@ -1,4 +1,4 @@
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKp8HQ1NxPAbeHVBG3QfWEH5N5VTTTqJgF_ddEidMw5c5gZlrxVsxRqiRAc6TjH1Bwrg/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZYfk70rs-WOOHQeq4RR93VtdzcpvTIk4aMv2rKUgFqGJ6RiOReb2QNnMbNZUp5fkLwg/exec";
 
 // DOM Elements
 const sectionLogin = document.getElementById('loginSection');
@@ -95,6 +95,7 @@ function setLoggedInState(nisn, nama) {
     
     switchTab('dashboard');
     fetchRekap(nisn);
+    fetchJurnal(nisn);
 }
 
 // Login Process
@@ -164,6 +165,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         switchTab(currentTab);
         if(currentTab === 'dashboard') renderDashboard();
         else if(currentTab === 'rekap') renderRekap();
+        else if(currentTab === 'jurnal') renderJurnal();
     });
 });
 
@@ -434,6 +436,339 @@ btnRetake.addEventListener('click', () => {
     btnSubmit.innerHTML = `Silakan Ambil Foto <i class="ph ph-camera text-lg"></i>`;
     updateSubmitVisibility();
 });
+
+// ===== JURNAL MINGGUAN LOGIC =====
+let jurnalPhotos = [null, null, null]; // base64 data for 3 slots
+let jurnalDataCache = []; // cached jurnal entries from server
+
+// Get current week's Monday and Sunday (Mon 00:00 - Sun 23:59)
+function getCurrentWeekRange() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun, 1=Mon...
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    
+    return { monday, sunday };
+}
+
+function getWeekId(date) {
+    // Generate a unique week ID based on the Monday of that week
+    const d = new Date(date);
+    const day = d.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diffToMonday);
+    d.setHours(0, 0, 0, 0);
+    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+}
+
+function formatDateIndo(date) {
+    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function handleJurnalFileSelect(input, slotNum) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showToast("Ukuran file maksimal 5MB!", "error");
+        input.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // Compress image
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const MAX_W = 800;
+            let w = img.width, h = img.height;
+            if (w > MAX_W) { h = h * (MAX_W / w); w = MAX_W; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL('image/jpeg', 0.5);
+            
+            jurnalPhotos[slotNum - 1] = compressed;
+            
+            // Update slot UI
+            const slot = document.getElementById(`jurnalSlot${slotNum}`);
+            const content = document.getElementById(`jurnalSlot${slotNum}Content`);
+            slot.classList.add('has-image');
+            content.innerHTML = `
+                <img src="${compressed}" class="jurnal-img-preview" alt="Foto ${slotNum}">
+                <div class="flex items-center justify-between mt-2 px-1">
+                    <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Foto ${slotNum}</span>
+                    <button onclick="event.stopPropagation(); removeJurnalPhoto(${slotNum})" class="text-xs text-rose-500 font-semibold hover:text-rose-700 flex items-center gap-1">
+                        <i class="ph ph-trash"></i> Hapus
+                    </button>
+                </div>
+            `;
+            updateJurnalUploadCount();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeJurnalPhoto(slotNum) {
+    jurnalPhotos[slotNum - 1] = null;
+    const slot = document.getElementById(`jurnalSlot${slotNum}`);
+    const content = document.getElementById(`jurnalSlot${slotNum}Content`);
+    const fileInput = document.getElementById(`jurnalFile${slotNum}`);
+    
+    slot.classList.remove('has-image');
+    content.innerHTML = `
+        <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+        <p class="text-sm font-semibold text-slate-500">Foto ${slotNum}</p>
+        <p class="text-xs text-slate-400">Tap untuk upload</p>
+    `;
+    fileInput.value = '';
+    updateJurnalUploadCount();
+}
+
+function updateJurnalUploadCount() {
+    const count = jurnalPhotos.filter(p => p !== null).length;
+    const countEl = document.getElementById('jurnalUploadCount');
+    const progressBar = document.getElementById('jurnalProgressBar');
+    const progressText = document.getElementById('jurnalProgressText');
+    
+    if (countEl) countEl.innerText = `${count}/3 foto`;
+    if (progressBar) progressBar.style.width = `${(count / 3) * 100}%`;
+    if (progressText) progressText.innerText = `${count}/3`;
+}
+
+async function submitJurnal() {
+    const photos = jurnalPhotos.filter(p => p !== null);
+    const keterangan = document.getElementById('jurnalKeterangan').value.trim();
+    
+    if (photos.length === 0) {
+        return showToast("Upload minimal 1 foto dokumentasi!", "error");
+    }
+    if (!keterangan) {
+        return showToast("Tulis keterangan kegiatan minggu ini!", "error");
+    }
+    
+    const { monday, sunday } = getCurrentWeekRange();
+    const weekId = getWeekId(new Date());
+    
+    // Check if already submitted this week
+    const existingEntry = jurnalDataCache.find(j => j.weekId === weekId);
+    if (existingEntry) {
+        return showToast("Jurnal minggu ini sudah dikirim!", "error");
+    }
+    
+    const btn = document.getElementById('btnSubmitJurnal');
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Mengirim...`;
+    loadingOverlay.classList.remove('hidden');
+    
+    try {
+        const payload = {
+            action: "submitJurnal",
+            nisn: userData.nisn,
+            weekId: weekId,
+            weekStart: `${monday.getDate().toString().padStart(2,'0')}/${(monday.getMonth()+1).toString().padStart(2,'0')}/${monday.getFullYear()}`,
+            weekEnd: `${sunday.getDate().toString().padStart(2,'0')}/${(sunday.getMonth()+1).toString().padStart(2,'0')}/${sunday.getFullYear()}`,
+            keterangan: keterangan,
+            photos: photos // Array of base64 strings
+        };
+        
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+            showToast("Jurnal berhasil dikirim! 🎉");
+            // Reset form
+            jurnalPhotos = [null, null, null];
+            for (let i = 1; i <= 3; i++) removeJurnalPhoto(i);
+            document.getElementById('jurnalKeterangan').value = '';
+            // Refresh data
+            fetchJurnal(userData.nisn);
+        } else {
+            showToast(result.message, "error");
+        }
+    } catch (e) {
+        showToast("Gagal mengirim jurnal. Periksa koneksi.", "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Jurnal Minggu Ini`;
+        loadingOverlay.classList.add('hidden');
+    }
+}
+
+async function fetchJurnal(nisn) {
+    try {
+        const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=getJurnal&nisn=${nisn}`);
+        const result = await res.json();
+        if (result.status === 'success') {
+            jurnalDataCache = result.data || [];
+            renderJurnal();
+        }
+    } catch (e) {
+        console.error("Gagal load jurnal", e);
+    }
+}
+
+function renderJurnal() {
+    const { monday, sunday } = getCurrentWeekRange();
+    const weekId = getWeekId(new Date());
+    
+    // Update week range display
+    const rangeEl = document.getElementById('jurnalWeekRange');
+    if (rangeEl) {
+        rangeEl.innerText = `${formatDateIndo(monday)} — ${formatDateIndo(sunday)}`;
+    }
+    
+    // Check if current week already submitted
+    const currentWeekEntry = jurnalDataCache.find(j => j.weekId === weekId);
+    const uploadSection = document.getElementById('jurnalUploadSection');
+    
+    if (currentWeekEntry) {
+        // Already submitted - show confirmation
+        uploadSection.innerHTML = `
+            <div class="text-center py-6">
+                <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="ph-fill ph-check-circle text-4xl text-emerald-500"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800 mb-1">Jurnal Terkirim!</h3>
+                <p class="text-sm text-slate-500">Jurnal minggu ini sudah berhasil dikirim pada ${currentWeekEntry.waktu || 'sebelumnya'}.</p>
+                <p class="text-xs text-slate-400 mt-2">${currentWeekEntry.photoCount || 0} foto • ${currentWeekEntry.keterangan ? currentWeekEntry.keterangan.substring(0, 60) + '...' : ''}</p>
+            </div>
+        `;
+        // Update progress
+        const count = currentWeekEntry.photoCount || 0;
+        const progressBar = document.getElementById('jurnalProgressBar');
+        const progressText = document.getElementById('jurnalProgressText');
+        if (progressBar) progressBar.style.width = `${(count / 3) * 100}%`;
+        if (progressText) progressText.innerText = `${count}/3`;
+    } else {
+        updateJurnalUploadCount();
+    }
+    
+    // Render history
+    const historyContainer = document.getElementById('jurnalHistory');
+    if (!jurnalDataCache.length) {
+        historyContainer.innerHTML = `<div class="text-center text-slate-400 text-sm py-6 font-medium bg-white rounded-xl border border-slate-200">Belum ada riwayat jurnal.</div>`;
+        return;
+    }
+    
+    // Sort by weekId descending (newest first)
+    const sorted = [...jurnalDataCache].sort((a, b) => b.weekId.localeCompare(a.weekId));
+    
+    let html = '';
+    sorted.forEach((entry, idx) => {
+        const isCurrentWeek = entry.weekId === weekId;
+        const photoCount = entry.photoCount || 0;
+        const progressPct = Math.round((photoCount / 3) * 100);
+        const progressColor = photoCount >= 3 ? 'bg-emerald-500' : photoCount >= 2 ? 'bg-amber-500' : 'bg-rose-500';
+        
+        // Build photo gallery HTML
+        let photosHtml = '';
+        const photoUrls = entry.photoUrls || [];
+        if (photoUrls.length > 0) {
+            photosHtml = `<div class="grid grid-cols-3 gap-2 mt-3">`;
+            photoUrls.forEach((url, i) => {
+                let thumbUrl = url;
+                if (url && url.includes('drive.google.com/file/d/')) {
+                    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) thumbUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w300`;
+                }
+                // Make download URL
+                let downloadUrl = url;
+                if (url && url.includes('drive.google.com/file/d/')) {
+                    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+                }
+                photosHtml += `
+                    <div class="relative group">
+                        <img src="${thumbUrl}" class="w-full aspect-square object-cover rounded-lg border border-slate-200 bg-slate-100 cursor-pointer" 
+                             onclick="openJurnalImageViewer('${thumbUrl.replace('sz=w300','sz=w1200')}', '${downloadUrl}', 'Foto ${i+1} - Minggu ${entry.weekStart}')" 
+                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzQ3NTU2OSIgZD0iTTEyIDJDMiAyIDIgMTIgMiAxMnMyIDEwIDEwIDEwIDEwLTEwIDEwLTEwUzIyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6Ii8+PC9zdmc+'" 
+                             alt="Foto ${i+1}">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <i class="ph ph-magnifying-glass-plus text-white text-xl"></i>
+                        </div>
+                    </div>
+                `;
+            });
+            photosHtml += `</div>`;
+        }
+        
+        html += `
+        <div class="jurnal-card ${isCurrentWeek ? 'ring-2 ring-primary/30' : ''}">
+            <div class="p-4">
+                <div class="flex items-start justify-between mb-2">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            ${isCurrentWeek ? '<span class="text-[10px] bg-primary text-white px-2 py-0.5 rounded-md font-bold uppercase">Minggu Ini</span>' : ''}
+                            <span class="text-[10px] ${progressColor.replace('bg-','text-').replace('500','600')} ${progressColor.replace('500','50')} border ${progressColor.replace('bg-','border-').replace('500','200')} px-2 py-0.5 rounded-md font-bold">${photoCount}/3 Foto</span>
+                        </div>
+                        <p class="text-sm font-bold text-slate-800">${entry.weekStart || ''} — ${entry.weekEnd || ''}</p>
+                    </div>
+                </div>
+                
+                <div class="jurnal-status-bar mb-3">
+                    <div class="jurnal-status-fill ${progressColor}" style="width: ${progressPct}%"></div>
+                </div>
+                
+                ${entry.keterangan ? `<p class="text-sm text-slate-600 leading-relaxed mb-1"><span class="font-semibold text-slate-700">Kegiatan:</span> ${entry.keterangan}</p>` : ''}
+                <p class="text-xs text-slate-400 mt-1"><i class="ph ph-clock"></i> Dikirim: ${entry.waktu || '-'}</p>
+                
+                ${photosHtml}
+            </div>
+        </div>`;
+    });
+    
+    historyContainer.innerHTML = html;
+}
+
+// Image Viewer Modal for Jurnal
+function openJurnalImageViewer(imgSrc, downloadUrl, title) {
+    // Create modal overlay
+    let modal = document.getElementById('jurnalImageModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'jurnalImageModal';
+    modal.className = 'fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center p-4 animate-fadeIn';
+    modal.innerHTML = `
+        <div class="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+            <p class="text-white text-sm font-semibold truncate flex-1 mr-4">${title}</p>
+            <div class="flex gap-2">
+                <a href="${downloadUrl}" target="_blank" rel="noopener" class="bg-white/20 backdrop-blur-sm text-white px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 hover:bg-white/30 transition-all">
+                    <i class="ph ph-download-simple text-lg"></i> Unduh
+                </a>
+                <button onclick="document.getElementById('jurnalImageModal').remove()" class="bg-white/20 backdrop-blur-sm text-white p-2 rounded-xl hover:bg-white/30 transition-all">
+                    <i class="ph ph-x text-xl font-bold"></i>
+                </button>
+            </div>
+        </div>
+        <img src="${imgSrc}" class="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl" alt="${title}">
+    `;
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    document.body.appendChild(modal);
+}
+// Make functions globally accessible
+window.handleJurnalFileSelect = handleJurnalFileSelect;
+window.removeJurnalPhoto = removeJurnalPhoto;
+window.submitJurnal = submitJurnal;
+window.openJurnalImageViewer = openJurnalImageViewer;
 
 btnSubmit.addEventListener('click', async () => {
     const selectedStatus = inputStatus.value;

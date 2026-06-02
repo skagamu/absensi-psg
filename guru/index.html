@@ -45,6 +45,19 @@
         .tab-btn.active { color: #1E3A8A; border-bottom: 2px solid #1E3A8A; font-weight: 600; }
         .tab-btn { color: #64748B; border-bottom: 2px solid transparent; font-weight: 500; }
 
+        /* Jurnal Styles */
+        .jurnal-card {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            transition: transform 0.2s ease;
+        }
+        .jurnal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .jurnal-status-bar { height: 4px; border-radius: 9999px; background: #E2E8F0; overflow: hidden; }
+        .jurnal-status-fill { height: 100%; border-radius: 9999px; transition: width 0.4s ease; }
+
         /* Print/PDF Export Styles */
         @media print {
             body { background: white !important; }
@@ -128,6 +141,9 @@
                     <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="detail">
                         <i class="ph ph-user-list text-lg"></i> Detail Siswa
                     </button>
+                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="jurnal">
+                        <i class="ph ph-notebook text-lg"></i> Jurnal
+                    </button>
                 </nav>
 
                 <!-- TAB CONTENTS -->
@@ -174,6 +190,11 @@
                         </div>
                     </div>
 
+                    <!-- PSG LOCATION INFO -->
+                    <div id="psgInfoSection" class="hidden">
+                        <div id="psgInfoContainer" class="space-y-3"></div>
+                    </div>
+
                     <!-- TAB: HARIAN -->
                     <div id="tab-harian" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
                         <div class="relative shrink-0 no-print">
@@ -214,7 +235,21 @@
                             </select>
                             <input type="month" id="detailMonthSelector" class="w-36 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-2 outline-none focus:border-primary shadow-sm">
                         </div>
+                        <!-- PSG Info for selected student -->
+                        <div id="detailPsgInfo" class="hidden"></div>
                         <div id="listDetailSiswa" class="flex-1 space-y-3 pb-4"></div>
+                    </div>
+
+                    <!-- TAB: JURNAL -->
+                    <div id="tab-jurnal" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
+                        <div class="flex gap-2 shrink-0 no-print">
+                            <select id="selectJurnalSiswa" class="flex-1 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm cursor-pointer">
+                                <option value="all">Semua Siswa</option>
+                            </select>
+                        </div>
+                        <div id="jurnalGuruContainer" class="flex-1 space-y-3 pb-4">
+                            <div class="text-center text-slate-400 text-sm py-6 font-medium">Memuat data jurnal...</div>
+                        </div>
                     </div>
                 </div>
             </div>

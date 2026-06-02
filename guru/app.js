@@ -51,6 +51,7 @@ function getMondayFromWeek(weekStr) {
 let rawDataCache = [];
 let daftarSiswaCache = [];
 let pengaturanCache = { tglMulai: '', tglSelesai: '', libur: [] };
+let jurnalGuruCache = [];
 let currentTab = 'dashboard';
 
 // Utilities
@@ -157,6 +158,12 @@ function switchTab(tabId) {
         target.classList.remove('hidden');
         if(tabId !== 'dashboard') target.classList.add('flex');
     }
+    // Show/hide PSG info based on tab
+    const psgSection = document.getElementById('psgInfoSection');
+    if (psgSection) {
+        if (tabId === 'dashboard') psgSection.classList.remove('hidden');
+        else psgSection.classList.add('hidden');
+    }
 }
 
 // Fetch Data
@@ -174,14 +181,24 @@ async function fetchData(namaGuru) {
             
             // Populate Detail Siswa Select
             selectDetailSiswa.innerHTML = '<option value="">-- Pilih Siswa --</option>';
+            const selectJurnalSiswa = document.getElementById('selectJurnalSiswa');
+            selectJurnalSiswa.innerHTML = '<option value="all">Semua Siswa</option>';
             daftarSiswaCache.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.nisn;
                 opt.textContent = s.nama;
                 selectDetailSiswa.appendChild(opt);
+                
+                const opt2 = document.createElement('option');
+                opt2.value = s.nisn;
+                opt2.textContent = s.nama;
+                selectJurnalSiswa.appendChild(opt2);
             });
             
             renderCurrentTab();
+            
+            // Fetch jurnal data
+            fetchJurnalGuru(namaGuru);
         } else {
             showToast(result.message, "error");
         }
@@ -261,6 +278,7 @@ function renderCurrentTab() {
     else if (currentTab === 'harian') renderHarian();
     else if (currentTab === 'periodik') renderPeriodik();
     else if (currentTab === 'detail') renderDetailSiswa();
+    else if (currentTab === 'jurnal') renderJurnalGuru();
 }
 
 function renderDashboard() {
@@ -280,6 +298,9 @@ function renderDashboard() {
     document.getElementById('dashSakit').innerText = S;
     document.getElementById('dashIzin').innerText = I;
     document.getElementById('dashBelum').innerText = A;
+    
+    // Render PSG Info Section in Dashboard
+    renderPsgInfoDashboard();
 }
 
 function renderHarian() {
@@ -564,7 +585,234 @@ function renderDetailSiswa() {
     listDetailSiswa.innerHTML = html;
 }
 
-// Events
+// ===== PSG INFO RENDERING =====
+function renderPsgInfoDashboard() {
+    const section = document.getElementById('psgInfoSection');
+    const container = document.getElementById('psgInfoContainer');
+    
+    if (!daftarSiswaCache.length) {
+        section.classList.add('hidden');
+        return;
+    }
+    
+    // Group students by PSG location
+    const psgGroups = {};
+    daftarSiswaCache.forEach(s => {
+        const lokasi = s.lokasiPKL || 'Belum Ditentukan';
+        if (!psgGroups[lokasi]) psgGroups[lokasi] = { detail: s.psgDetail, students: [] };
+        psgGroups[lokasi].students.push(s);
+    });
+    
+    let html = `<h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <i class="ph ph-map-pin text-primary text-lg"></i> Info Lokasi PSG
+    </h3>`;
+    
+    Object.entries(psgGroups).forEach(([lokasi, group]) => {
+        const detail = group.detail;
+        const studentNames = group.students.map(s => `<span class="inline-block bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-blue-100 mr-1 mb-1">${s.nama}</span>`).join('');
+        
+        html += `
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-3">
+            <div class="flex items-start gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                    <i class="ph-fill ph-buildings text-xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h4 class="text-sm font-bold text-slate-800">${lokasi}</h4>
+                    ${detail && detail.alamat ? `<p class="text-xs text-slate-500 mt-0.5"><i class="ph ph-map-pin"></i> ${detail.alamat}</p>` : ''}
+                </div>
+            </div>
+            ${detail ? `
+            <div class="grid grid-cols-1 gap-2 mb-3">
+                ${detail.pemilik ? `
+                <div class="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                    <i class="ph ph-crown text-amber-500"></i>
+                    <div><p class="text-[10px] text-slate-400 font-semibold uppercase">Pemilik</p><p class="text-xs font-bold text-slate-700">${detail.pemilik}</p></div>
+                </div>` : ''}
+                ${detail.contactPerson ? `
+                <div class="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                    <i class="ph ph-user-circle text-blue-500"></i>
+                    <div class="flex-1"><p class="text-[10px] text-slate-400 font-semibold uppercase">Contact Person</p><p class="text-xs font-bold text-slate-700">${detail.contactPerson}</p></div>
+                    ${detail.noTelpCP ? `<a href="tel:${detail.noTelpCP}" class="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all"><i class="ph ph-phone text-sm"></i></a>` : ''}
+                </div>` : ''}
+                ${detail.noTelpCP ? `
+                <div class="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                    <i class="ph ph-phone text-emerald-500"></i>
+                    <div><p class="text-[10px] text-slate-400 font-semibold uppercase">No. Telepon</p><p class="text-xs font-bold text-slate-700">${detail.noTelpCP}</p></div>
+                </div>` : ''}
+            </div>` : ''}
+            <div class="border-t border-slate-100 pt-2">
+                <p class="text-[10px] text-slate-400 font-semibold uppercase mb-1">Siswa (${group.students.length})</p>
+                <div class="flex flex-wrap">${studentNames}</div>
+            </div>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+    // Visibility is controlled by switchTab()
+    if (currentTab === 'dashboard') {
+        section.classList.remove('hidden');
+    } else {
+        section.classList.add('hidden');
+    }
+}
+
+function renderDetailPsgInfo(nisn) {
+    const detailPsgInfo = document.getElementById('detailPsgInfo');
+    if (!detailPsgInfo) return;
+    
+    const student = daftarSiswaCache.find(s => s.nisn === nisn);
+    if (!student || !student.psgDetail) {
+        detailPsgInfo.classList.add('hidden');
+        detailPsgInfo.innerHTML = '';
+        return;
+    }
+    
+    const d = student.psgDetail;
+    detailPsgInfo.classList.remove('hidden');
+    detailPsgInfo.innerHTML = `
+    <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 p-4 space-y-3">
+        <div class="flex items-center gap-2">
+            <i class="ph-fill ph-buildings text-indigo-600 text-lg"></i>
+            <h4 class="text-sm font-bold text-slate-800">${student.lokasiPKL || '-'}</h4>
+        </div>
+        <div class="grid grid-cols-1 gap-2 text-xs">
+            <div class="flex items-start gap-2">
+                <i class="ph ph-student text-slate-400 mt-0.5"></i>
+                <div><span class="text-slate-400 font-semibold">Siswa:</span> <span class="text-slate-700 font-bold">${student.nama}</span> • <span class="text-slate-500">${student.kelas || '-'}</span> • <span class="text-slate-500">NISN: ${student.nisn}</span></div>
+            </div>
+            ${student.kontak ? `<div class="flex items-center gap-2"><i class="ph ph-phone text-slate-400"></i><span class="text-slate-400 font-semibold">Kontak Siswa:</span> <span class="text-slate-700 font-bold">${student.kontak}</span></div>` : ''}
+            ${d.alamat ? `<div class="flex items-start gap-2"><i class="ph ph-map-pin text-slate-400 mt-0.5"></i><span class="text-slate-400 font-semibold">Alamat:</span> <span class="text-slate-700">${d.alamat}</span></div>` : ''}
+            ${d.pemilik ? `<div class="flex items-center gap-2"><i class="ph ph-crown text-amber-500"></i><span class="text-slate-400 font-semibold">Pemilik:</span> <span class="text-slate-700 font-bold">${d.pemilik}</span></div>` : ''}
+            ${d.contactPerson ? `<div class="flex items-center gap-2"><i class="ph ph-user-circle text-blue-500"></i><span class="text-slate-400 font-semibold">CP:</span> <span class="text-slate-700 font-bold">${d.contactPerson}</span> ${d.noTelpCP ? `(<a href="tel:${d.noTelpCP}" class="text-blue-600 underline">${d.noTelpCP}</a>)` : ''}</div>` : ''}
+        </div>
+    </div>`;
+}
+
+// ===== JURNAL GURU LOGIC =====
+async function fetchJurnalGuru(namaGuru) {
+    try {
+        const url = `${GOOGLE_SCRIPT_URL}?action=getJurnalGuru&namaGuru=${encodeURIComponent(namaGuru)}`;
+        const res = await fetch(url);
+        const result = await res.json();
+        if (result.status === 'success') {
+            jurnalGuruCache = result.data || [];
+            if (currentTab === 'jurnal') renderJurnalGuru();
+        }
+    } catch (e) {
+        console.error("Gagal load jurnal guru", e);
+    }
+}
+
+function renderJurnalGuru() {
+    const container = document.getElementById('jurnalGuruContainer');
+    const filterNisn = document.getElementById('selectJurnalSiswa').value;
+    
+    let data = jurnalGuruCache;
+    if (filterNisn !== 'all') {
+        data = data.filter(j => j.nisn === filterNisn);
+    }
+    
+    if (!data.length) {
+        container.innerHTML = `<div class="text-center text-slate-400 text-sm py-10 font-medium bg-white rounded-xl border border-slate-200">Belum ada data jurnal.</div>`;
+        return;
+    }
+    
+    // Sort by weekId descending
+    const sorted = [...data].sort((a, b) => b.weekId.localeCompare(a.weekId));
+    
+    let html = '';
+    sorted.forEach(entry => {
+        const photoCount = entry.photoCount || 0;
+        const progressPct = Math.round((photoCount / 3) * 100);
+        const progressColor = photoCount >= 3 ? 'bg-emerald-500' : photoCount >= 2 ? 'bg-amber-500' : 'bg-rose-500';
+        
+        // Photo gallery
+        let photosHtml = '';
+        const photoUrls = entry.photoUrls || [];
+        if (photoUrls.length > 0) {
+            photosHtml = `<div class="grid grid-cols-3 gap-2 mt-3">`;
+            photoUrls.forEach((url, i) => {
+                let thumbUrl = url;
+                if (url && url.includes('drive.google.com/file/d/')) {
+                    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) thumbUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w300`;
+                }
+                let downloadUrl = url;
+                if (url && url.includes('drive.google.com/file/d/')) {
+                    const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+                }
+                photosHtml += `
+                    <div class="relative group cursor-pointer" onclick="openGuruImageViewer('${thumbUrl.replace('sz=w300','sz=w1200')}', '${downloadUrl}', 'Foto ${i+1} - ${entry.nama} - Minggu ${entry.weekStart}')">
+                        <img src="${thumbUrl}" class="w-full aspect-square object-cover rounded-lg border border-slate-200 bg-slate-100" 
+                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzQ3NTU2OSIgZD0iTTEyIDJDMiAyIDIgMTIgMiAxMnMyIDEwIDEwIDEwIDEwLTEwIDEwLTEwUzIyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6Ii8+PC9zdmc+'" 
+                             alt="Foto ${i+1}">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <i class="ph ph-magnifying-glass-plus text-white text-xl"></i>
+                        </div>
+                    </div>`;
+            });
+            photosHtml += `</div>`;
+        }
+        
+        html += `
+        <div class="jurnal-card">
+            <div class="p-4">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <span class="text-xs font-bold text-primary bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 truncate">${entry.nama}</span>
+                            <span class="text-[10px] ${progressColor.replace('bg-','text-').replace('500','600')} ${progressColor.replace('500','50')} border ${progressColor.replace('bg-','border-').replace('500','200')} px-2 py-0.5 rounded-md font-bold">${photoCount}/3 Foto</span>
+                        </div>
+                        <p class="text-sm font-bold text-slate-800">${entry.weekStart || ''} — ${entry.weekEnd || ''}</p>
+                    </div>
+                </div>
+                
+                <div class="jurnal-status-bar mb-3">
+                    <div class="jurnal-status-fill ${progressColor}" style="width: ${progressPct}%"></div>
+                </div>
+                
+                ${entry.keterangan ? `<p class="text-sm text-slate-600 leading-relaxed mb-1"><span class="font-semibold text-slate-700">Kegiatan:</span> ${entry.keterangan}</p>` : ''}
+                <p class="text-xs text-slate-400 mt-1"><i class="ph ph-clock"></i> Dikirim: ${entry.waktu || '-'}</p>
+                
+                ${photosHtml}
+            </div>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Image Viewer for Guru
+function openGuruImageViewer(imgSrc, downloadUrl, title) {
+    let modal = document.getElementById('guruImageModal');
+    if (modal) modal.remove();
+    
+    modal = document.createElement('div');
+    modal.id = 'guruImageModal';
+    modal.className = 'fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center p-4';
+    modal.style.animation = 'fadeIn 0.2s ease-out forwards';
+    modal.innerHTML = `
+        <div class="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+            <p class="text-white text-sm font-semibold truncate flex-1 mr-4">${title}</p>
+            <div class="flex gap-2">
+                <a href="${downloadUrl}" target="_blank" rel="noopener" class="bg-white/20 backdrop-blur-sm text-white px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1.5 hover:bg-white/30 transition-all">
+                    <i class="ph ph-download-simple text-lg"></i> Unduh
+                </a>
+                <button onclick="document.getElementById('guruImageModal').remove()" class="bg-white/20 backdrop-blur-sm text-white p-2 rounded-xl hover:bg-white/30 transition-all">
+                    <i class="ph ph-x text-xl font-bold"></i>
+                </button>
+            </div>
+        </div>
+        <img src="${imgSrc}" class="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl" alt="${title}">
+    `;
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    document.body.appendChild(modal);
+}
+
 searchHarian.addEventListener('input', renderHarian);
 searchPeriodik.addEventListener('input', renderPeriodik);
 filterPeriodik.addEventListener('change', (e) => {
@@ -576,7 +824,12 @@ filterPeriodik.addEventListener('change', (e) => {
 weekSelector.addEventListener('change', renderPeriodik);
 monthSelector.addEventListener('change', renderPeriodik);
 
-selectDetailSiswa.addEventListener('change', renderDetailSiswa);
+selectDetailSiswa.addEventListener('change', () => {
+    renderDetailSiswa();
+    renderDetailPsgInfo(selectDetailSiswa.value);
+});
 detailMonthSelector.addEventListener('change', renderDetailSiswa);
+
+document.getElementById('selectJurnalSiswa').addEventListener('change', renderJurnalGuru);
 
 document.getElementById('btnExportPdf').addEventListener('click', () => window.print());
