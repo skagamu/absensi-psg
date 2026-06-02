@@ -1,4 +1,4 @@
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKp8HQ1NxPAbeHVBG3QfWEH5N5VTTTqJgF_ddEidMw5c5gZlrxVsxRqiRAc6TjH1Bwrg/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJWdUPFWpuGEm6jY1cVsgUr-h1S9qAewQxDPxn3R9vkEQ9I8tnPaItJDchdt_TAE2blg/exec";
 
 // DOM Elements
 const sectionLogin = document.getElementById('loginSection');
