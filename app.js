@@ -1,5 +1,4 @@
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJWdUPFWpuGEm6jY1cVsgUr-h1S9qAewQxDPxn3R9vkEQ9I8tnPaItJDchdt_TAE2blg/exec";
-
+const GOOGLE_S
 // DOM Elements
 const sectionLogin = document.getElementById('loginSection');
 const mainApp = document.getElementById('mainApp');
