@@ -1,4 +1,4 @@
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJWdUPFWpuGEm6jY1cVsgUr-h1S9qAewQxDPxn3R9vkEQ9I8tnPaItJDchdt_TAE2blg/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZYfk70rs-WOOHQeq4RR93VtdzcpvTIk4aMv2rKUgFqGJ6RiOReb2QNnMbNZUp5fkLwg/exec";
 
 // DOM Elements
 const sectionLogin = document.getElementById('loginSection');
@@ -213,12 +213,15 @@ function renderDashboard() {
     const todayStr = getTodayStr();
     const todayRecord = rekapDataCache.find(r => r.tanggal === todayStr);
     
+    const btnCancelAbsen = document.getElementById('btnCancelAbsen');
     if (todayRecord) {
         dashStatusHariIni.innerText = `${todayRecord.status} pukul ${todayRecord.waktu}`;
-        dashStatusHariIni.className = `font-bold text-sm ${todayRecord.status === 'Hadir' ? 'text-emerald-300' : 'text-amber-300'}`;
+        dashStatusHariIni.className = `font-bold text-sm ${todayRecord.status === 'Hadir' ? 'text-emerald-500' : 'text-amber-500'}`;
+        if (btnCancelAbsen) btnCancelAbsen.classList.remove('hidden');
     } else {
         dashStatusHariIni.innerText = "Belum Absen";
-        dashStatusHariIni.className = "font-bold text-sm text-slate-300";
+        dashStatusHariIni.className = "font-bold text-sm text-slate-400";
+        if (btnCancelAbsen) btnCancelAbsen.classList.add('hidden');
     }
 
     const filter = dashBulanFilter.value;
@@ -647,6 +650,9 @@ function renderJurnal() {
                 <h3 class="text-lg font-bold text-slate-800 mb-1">Jurnal Terkirim!</h3>
                 <p class="text-sm text-slate-500">Jurnal minggu ini sudah berhasil dikirim pada ${currentWeekEntry.waktu || 'sebelumnya'}.</p>
                 <p class="text-xs text-slate-400 mt-2">${currentWeekEntry.photoCount || 0} foto • ${currentWeekEntry.keterangan ? currentWeekEntry.keterangan.substring(0, 60) + '...' : ''}</p>
+                <button onclick="deleteJurnal('${currentWeekEntry.id}')" class="mt-4 bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 mx-auto border border-rose-200">
+                    <i class="ph ph-trash"></i> Hapus & Upload Ulang
+                </button>
             </div>
         `;
         // Update progress
@@ -719,6 +725,9 @@ function renderJurnal() {
                         </div>
                         <p class="text-sm font-bold text-slate-800">${entry.weekStart || ''} — ${entry.weekEnd || ''}</p>
                     </div>
+                    <button onclick="deleteJurnal('${entry.id}')" class="text-slate-400 hover:text-rose-500 transition-colors p-1" title="Hapus Jurnal">
+                        <i class="ph ph-trash text-lg"></i>
+                    </button>
                 </div>
                 
                 <div class="jurnal-status-bar mb-3">
@@ -769,6 +778,96 @@ window.handleJurnalFileSelect = handleJurnalFileSelect;
 window.removeJurnalPhoto = removeJurnalPhoto;
 window.submitJurnal = submitJurnal;
 window.openJurnalImageViewer = openJurnalImageViewer;
+
+window.deleteAbsenHariIni = async function() {
+    if(!confirm("Apakah Anda yakin ingin membatalkan (menghapus) absen hari ini?")) return;
+    
+    loadingOverlay.classList.remove('hidden');
+    try {
+        const payload = { action: "deleteAbsen", nisn: userData.nisn };
+        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+            showToast("Absen hari ini berhasil dibatalkan!");
+            fetchRekap(userData.nisn); // Reload data
+        } else {
+            showToast(result.message, "error");
+        }
+    } catch (e) {
+        showToast("Gagal membatalkan absen. Periksa koneksi.", "error");
+    } finally {
+        loadingOverlay.classList.add('hidden');
+    }
+}
+
+window.deleteJurnal = async function(id) {
+    if(!confirm("Apakah Anda yakin ingin menghapus jurnal ini? Anda dapat mengupload ulang setelah dihapus.")) return;
+    
+    loadingOverlay.classList.remove('hidden');
+    try {
+        const payload = { action: "deleteJurnal", id: id, nisn: userData.nisn };
+        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+            showToast("Jurnal berhasil dihapus!");
+            // Reset state jurnal upload UI jika menghapus jurnal minggu ini
+            document.getElementById('jurnalUploadSection').innerHTML = `
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <i class="ph ph-camera-plus text-primary text-lg"></i> Upload Dokumentasi
+                    </h3>
+                    <span id="jurnalUploadCount" class="text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg">0/3 foto</span>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-3" id="jurnalPhotoSlots">
+                    <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
+                        <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
+                        <div id="jurnalSlot1Content">
+                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                            <p class="text-sm font-semibold text-slate-500">Foto 1</p>
+                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                        </div>
+                    </div>
+                    <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
+                        <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
+                        <div id="jurnalSlot2Content">
+                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                            <p class="text-sm font-semibold text-slate-500">Foto 2</p>
+                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                        </div>
+                    </div>
+                    <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
+                        <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
+                        <div id="jurnalSlot3Content">
+                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                            <p class="text-sm font-semibold text-slate-500">Foto 3</p>
+                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Keterangan / Kegiatan Minggu Ini</label>
+                    <textarea id="jurnalKeterangan" placeholder="Tuliskan kegiatan yang dilakukan selama minggu ini di tempat PSG..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-24"></textarea>
+                </div>
+
+                <button id="btnSubmitJurnal" onclick="submitJurnal()" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm">
+                    <i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Jurnal Minggu Ini
+                </button>
+            `;
+            jurnalPhotos = [null, null, null];
+            fetchJurnal(userData.nisn); // Reload data
+        } else {
+            showToast(result.message, "error");
+        }
+    } catch (e) {
+        showToast("Gagal menghapus jurnal. Periksa koneksi.", "error");
+    } finally {
+        loadingOverlay.classList.add('hidden');
+    }
+}
 
 btnSubmit.addEventListener('click', async () => {
     const selectedStatus = inputStatus.value;
