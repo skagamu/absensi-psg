@@ -274,8 +274,9 @@
 
                     <!-- TAB: ABSEN (KAMERA & LOKASI) -->
                     <div id="tab-absen" class="tab-content animate-fadeIn space-y-4 hidden flex-col">
-                        <!-- CAMERA BOX -->
-                        <div class="camera-box bg-slate-200 rounded-3xl overflow-hidden relative shadow-inner border-2 border-white">
+                        <div id="absenFormContainer" class="space-y-4 flex-col flex">
+                            <!-- CAMERA BOX -->
+                            <div class="camera-box bg-slate-200 rounded-3xl overflow-hidden relative shadow-inner border-2 border-white">
                             <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
                             <img id="photo" class="hidden w-full h-full object-cover">
                             <canvas id="canvas" class="hidden"></canvas>
@@ -320,14 +321,39 @@
                                 <textarea id="inputAlasan" placeholder="Tulis alasan izin/sakit..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-20"></textarea>
                             </div>
 
-                            <div class="flex flex-col gap-1.5 mt-2 hidden" id="boxAgenda">
-                                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Kegiatan / Agenda Harian</label>
-                                <textarea id="inputAgenda" placeholder="Tuliskan deskripsi kegiatan yang dilakukan hari ini di bengkel..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-20"></textarea>
-                            </div>
-
                             <button id="btnSubmit" disabled class="w-full bg-slate-300 text-slate-500 font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all mt-2">
                                 Silakan Ambil Foto <i class="ph ph-camera text-lg"></i>
                             </button>
+                        </div>
+                        </div>
+
+                        <!-- SUCCESS CONTAINER (Hidden by default) -->
+                        <div id="absenSuccessContainer" class="hidden flex-col gap-4">
+                            <div class="bg-emerald-50 border border-emerald-100 rounded-3xl p-5 shadow-sm text-center relative overflow-hidden">
+                                <div class="absolute -right-4 -bottom-4 opacity-10">
+                                    <i class="ph-fill ph-check-circle text-[100px] text-emerald-600"></i>
+                                </div>
+                                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 relative z-10">
+                                    <i class="ph-fill ph-check-circle text-4xl"></i>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-1 relative z-10">Berhasil Absen!</h3>
+                                <p class="text-sm text-slate-500 mb-4 relative z-10">Anda sudah mencatatkan kehadiran hari ini.</p>
+                                <button onclick="deleteAbsenHariIni()" class="relative z-10 mx-auto bg-white hover:bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border border-slate-200 hover:border-rose-200 shadow-sm">
+                                    <i class="ph ph-arrows-clockwise text-lg"></i> Ulangi Absensi
+                                </button>
+                            </div>
+                            
+                            <!-- Agenda Harian Section -->
+                            <div id="agendaHarianSection" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-3">
+                                <div class="flex items-center justify-between mb-1">
+                                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                        <i class="ph ph-note-pencil text-primary text-lg"></i> Agenda Harian
+                                    </h3>
+                                </div>
+                                <div id="agendaContent">
+                                    <!-- Rendered dynamically in app.js -->
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -351,22 +377,6 @@
                             </div>
                         </div>
 
-                        <!-- Agenda Harian Section -->
-                        <div id="agendaHarianSection" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-                            <div class="flex items-center justify-between mb-1">
-                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                    <i class="ph ph-note-pencil text-primary text-lg"></i> Jurnal Harian
-                                </h3>
-                            </div>
-                            <div id="agendaContent">
-                                <p class="text-xs text-slate-500 mb-2">Silakan isi kegiatan Anda hari ini. Anda harus absen terlebih dahulu.</p>
-                                <textarea id="inputAgendaHarianBaru" placeholder="Tuliskan deskripsi kegiatan hari ini..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-24 mb-2"></textarea>
-                                <button id="btnSubmitAgenda" onclick="submitAgendaHarian()" class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-all shadow-sm">
-                                    <i class="ph ph-check-circle text-lg font-bold"></i> Simpan Jurnal Harian
-                                </button>
-                            </div>
-                        </div>
-
                         <!-- Upload Section (Dokumentasi Mingguan) -->
                         <div id="jurnalUploadSection" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
                             <div class="flex items-center justify-between">
@@ -379,7 +389,7 @@
                             <!-- Photo Upload Slots -->
                             <div class="grid grid-cols-1 gap-4" id="jurnalPhotoSlots">
                                 <!-- Slot 1 -->
-                                <div>
+                                <div id="slotContainer1">
                                     <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
                                         <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
                                         <div id="jurnalSlot1Content">
@@ -391,17 +401,33 @@
                                     <textarea id="jurnalKeterangan1" placeholder="Keterangan foto 1..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
                                 </div>
                                 <!-- Slot 2 -->
-                                <div>
+                                <div id="slotContainer2" class="hidden">
                                     <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
                                         <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
                                         <div id="jurnalSlot2Content">
                                             <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                                            <p class="text-sm font-semibold text-slate-500">Foto 2</p>
+                                            <p class="text-sm font-semibold text-slate-500">Foto 2 (Rekomendasi)</p>
                                             <p class="text-xs text-slate-400">Tap untuk upload</p>
                                         </div>
                                     </div>
                                     <textarea id="jurnalKeterangan2" placeholder="Keterangan foto 2..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
                                 </div>
+                                <!-- Slot 3 -->
+                                <div id="slotContainer3" class="hidden">
+                                    <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
+                                        <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
+                                        <div id="jurnalSlot3Content">
+                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                            <p class="text-sm font-semibold text-slate-500">Foto 3 (Opsional)</p>
+                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                                        </div>
+                                    </div>
+                                    <textarea id="jurnalKeterangan3" placeholder="Keterangan foto 3..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                                </div>
+                                
+                                <button id="btnAddSlot" onclick="tambahSlotJurnal()" class="w-full border-2 border-dashed border-slate-200 text-slate-500 hover:text-primary hover:border-primary hover:bg-blue-50 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all">
+                                    <i class="ph ph-plus-circle text-lg"></i> Tambah Dokumentasi
+                                </button>
                             </div>
 
                             <!-- Submit Button -->

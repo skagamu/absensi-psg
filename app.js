@@ -157,7 +157,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             stopCamera();
             if (gpsInterval) clearTimeout(gpsInterval);
         }
-        if (nextTab === 'absen' && currentTab !== 'absen') { initCamera(); getLocation(); }
+        if (nextTab === 'absen' && currentTab !== 'absen') { 
+            initCamera(); 
+            getLocation(); 
+            renderKehadiran();
+        }
         
         currentTab = nextTab;
         switchTab(currentTab);
@@ -189,6 +193,7 @@ async function fetchRekap(nisn) {
 
             renderDashboard();
             renderRekap();
+            renderKehadiran();
         }
     } catch (e) { console.error("Gagal load rekap", e); }
 }
@@ -465,7 +470,8 @@ btnRetake.addEventListener('click', () => {
 });
 
 // ===== JURNAL MINGGUAN LOGIC =====
-let jurnalPhotos = [null, null]; // base64 data for 2 slots
+let jurnalPhotos = [null, null, null]; // base64 data for 3 slots
+let visibleJurnalSlots = 1;
 let jurnalDataCache = []; // cached jurnal entries from server
 
 // Get current week's Monday and Sunday (Mon 00:00 - Sun 23:59)
@@ -569,25 +575,61 @@ function updateJurnalUploadCount() {
     const progressBar = document.getElementById('jurnalProgressBar');
     const progressText = document.getElementById('jurnalProgressText');
     
-    if (countEl) countEl.innerText = `${count}/2 foto`;
-    if (progressBar) progressBar.style.width = `${(count / 2) * 100}%`;
-    if (progressText) progressText.innerText = `${count}/2`;
+    let colorClass = 'bg-slate-400';
+    let countElBg = 'bg-slate-100';
+    let countElText = 'text-slate-500';
+    
+    if (count === 1) { colorClass = 'bg-amber-400'; countElBg = 'bg-amber-100'; countElText = 'text-amber-600'; }
+    else if (count === 2) { colorClass = 'bg-emerald-400'; countElBg = 'bg-emerald-100'; countElText = 'text-emerald-600'; }
+    else if (count >= 3) { colorClass = 'bg-rose-500'; countElBg = 'bg-rose-100'; countElText = 'text-rose-600'; }
+    
+    if (countEl) {
+        countEl.innerText = `${count}/2 foto`;
+        countEl.className = `text-xs font-bold px-2 py-1 rounded-lg ${countElBg} ${countElText}`;
+    }
+    if (progressBar) {
+        progressBar.style.width = `${Math.min((count / 2) * 100, 100)}%`;
+        progressBar.className = `jurnal-status-fill ${colorClass}`;
+    }
+    if (progressText) {
+        progressText.innerText = `${count}/2`;
+    }
+}
+
+window.tambahSlotJurnal = function() {
+    if (visibleJurnalSlots < 3) {
+        visibleJurnalSlots++;
+        const slotEl = document.getElementById(`slotContainer${visibleJurnalSlots}`);
+        if (slotEl) {
+            slotEl.classList.remove('hidden');
+        }
+        if (visibleJurnalSlots >= 3) {
+            document.getElementById('btnAddSlot').classList.add('hidden');
+        }
+    }
 }
 
 async function submitJurnal() {
-    const photos = jurnalPhotos.filter(p => p !== null);
-    const ket1 = document.getElementById('jurnalKeterangan1').value.trim();
-    const ket2 = document.getElementById('jurnalKeterangan2').value.trim();
+    const photos = [];
+    const ketLines = [];
     
-    if (photos.length !== 2) {
-        return showToast("Mohon upload kedua foto dokumentasi (Foto 1 dan Foto 2)!", "error");
+    for (let i = 1; i <= visibleJurnalSlots; i++) {
+        let p = jurnalPhotos[i-1];
+        let ketEl = document.getElementById(`jurnalKeterangan${i}`);
+        let ket = ketEl ? ketEl.value.trim() : "";
+        
+        if (!p) {
+            return showToast(`Mohon upload Foto ${i}!`, "error");
+        }
+        if (!ket) {
+            return showToast(`Mohon isi keterangan untuk Foto ${i}!`, "error");
+        }
+        
+        photos.push(p);
+        ketLines.push(`Foto ${i}: ${ket}`);
     }
     
-    if (!ket1 || !ket2) {
-        return showToast("Mohon isi keterangan untuk kedua foto dokumentasi!", "error");
-    }
-
-    const keterangan = `Foto 1: ${ket1}\n\nFoto 2: ${ket2}`;
+    const keterangan = ketLines.join('\n\n');
     
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
@@ -624,10 +666,18 @@ async function submitJurnal() {
         if (result.status === 'success') {
             showToast("Dokumentasi berhasil dikirim! 🎉");
             // Reset form
-            jurnalPhotos = [null, null];
-            for (let i = 1; i <= 2; i++) removeJurnalPhoto(i);
-            document.getElementById('jurnalKeterangan1').value = '';
-            document.getElementById('jurnalKeterangan2').value = '';
+            jurnalPhotos = [null, null, null];
+            visibleJurnalSlots = 1;
+            for (let i = 1; i <= 3; i++) {
+                removeJurnalPhoto(i);
+                let ketEl = document.getElementById(`jurnalKeterangan${i}`);
+                if(ketEl) ketEl.value = '';
+                if(i > 1) {
+                    let slotC = document.getElementById(`slotContainer${i}`);
+                    if(slotC) slotC.classList.add('hidden');
+                }
+            }
+            document.getElementById('btnAddSlot').classList.remove('hidden');
             // Refresh data
             fetchJurnal(userData.nisn);
         } else {
@@ -656,6 +706,41 @@ async function fetchJurnal(nisn) {
     }
 }
 
+function renderKehadiran() {
+    const todayStr = getTodayStr();
+    const todayRecord = rekapDataCache.find(r => r.tanggal === todayStr);
+    const formContainer = document.getElementById('absenFormContainer');
+    const successContainer = document.getElementById('absenSuccessContainer');
+    
+    if (todayRecord) {
+        if(formContainer) { formContainer.classList.add('hidden'); formContainer.classList.remove('flex'); }
+        if(successContainer) { successContainer.classList.remove('hidden'); successContainer.classList.add('flex'); }
+        stopCamera();
+        renderAgendaHarian(todayRecord);
+    } else {
+        if(formContainer) { formContainer.classList.remove('hidden'); formContainer.classList.add('flex'); }
+        if(successContainer) { successContainer.classList.add('hidden'); successContainer.classList.remove('flex'); }
+    }
+}
+
+function renderAgendaHarian(todayRecord) {
+    const agendaContent = document.getElementById('agendaContent');
+    if (!agendaContent) return;
+    
+    if (todayRecord.status !== 'Hadir') {
+        agendaContent.innerHTML = `<div class="text-center py-4 bg-slate-50 rounded-xl border border-slate-100"><i class="ph ph-info text-2xl text-blue-500 mb-1"></i><p class="text-sm font-medium text-slate-500">Status Anda hari ini: ${todayRecord.status}.<br>Tidak perlu mengisi jurnal harian.</p></div>`;
+    } else {
+        let currentText = todayRecord.agenda || "";
+        agendaContent.innerHTML = `
+            <p class="text-xs text-slate-500 mb-2">Silakan isi atau ubah kegiatan Anda hari ini.</p>
+            <textarea id="inputAgendaHarianBaru" placeholder="Tuliskan deskripsi kegiatan hari ini..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-24 mb-2">${currentText}</textarea>
+            <button id="btnSubmitAgenda" onclick="submitAgendaHarian()" class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-all shadow-sm">
+                <i class="ph ph-check-circle text-lg font-bold"></i> Simpan Jurnal Harian
+            </button>
+        `;
+    }
+}
+
 function renderJurnal() {
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
@@ -665,39 +750,6 @@ function renderJurnal() {
     if (rangeEl) {
         rangeEl.innerText = `${formatDateIndo(monday)} — ${formatDateIndo(sunday)}`;
     }
-    
-    // --- Agenda Harian UI Logic ---
-    const todayStr = getTodayStr();
-    const todayRecord = rekapDataCache.find(r => r.tanggal === todayStr);
-    const agendaContent = document.getElementById('agendaContent');
-    
-    if (agendaContent) {
-        if (!todayRecord) {
-            agendaContent.innerHTML = `<div class="text-center py-4 bg-slate-50 rounded-xl border border-slate-100"><i class="ph ph-warning-circle text-2xl text-amber-500 mb-1"></i><p class="text-sm font-medium text-slate-500">Anda belum absen hari ini.<br>Silakan absen kehadiran terlebih dahulu.</p></div>`;
-        } else if (todayRecord.status !== 'Hadir') {
-            agendaContent.innerHTML = `<div class="text-center py-4 bg-slate-50 rounded-xl border border-slate-100"><i class="ph ph-info text-2xl text-blue-500 mb-1"></i><p class="text-sm font-medium text-slate-500">Status Anda hari ini: ${todayRecord.status}.<br>Tidak perlu mengisi jurnal harian.</p></div>`;
-        } else if (todayRecord.agenda && todayRecord.agenda.trim() !== '') {
-            agendaContent.innerHTML = `
-                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex gap-3">
-                    <div class="w-10 h-10 shrink-0 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600"><i class="ph-fill ph-check-circle text-xl"></i></div>
-                    <div>
-                        <p class="text-sm font-bold text-emerald-800 mb-1">Jurnal Harian Tersimpan!</p>
-                        <p class="text-xs text-emerald-600 italic">"${todayRecord.agenda}"</p>
-                    </div>
-                </div>
-            `;
-        } else {
-            // Form to fill
-            agendaContent.innerHTML = `
-                <p class="text-xs text-slate-500 mb-2">Silakan isi kegiatan Anda hari ini.</p>
-                <textarea id="inputAgendaHarianBaru" placeholder="Tuliskan deskripsi kegiatan hari ini..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-24 mb-2"></textarea>
-                <button id="btnSubmitAgenda" onclick="submitAgendaHarian()" class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-all shadow-sm">
-                    <i class="ph ph-check-circle text-lg font-bold"></i> Simpan Jurnal Harian
-                </button>
-            `;
-        }
-    }
-    // --------------------------------
     
     // Check if current week already submitted
     const currentWeekEntry = jurnalDataCache.find(j => j.weekId === weekId);
@@ -915,7 +967,7 @@ window.deleteJurnal = async function(id) {
                 </div>
                 
                 <div class="grid grid-cols-1 gap-4" id="jurnalPhotoSlots">
-                    <div>
+                    <div id="slotContainer1">
                         <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
                             <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
                             <div id="jurnalSlot1Content">
@@ -926,25 +978,41 @@ window.deleteJurnal = async function(id) {
                         </div>
                         <textarea id="jurnalKeterangan1" placeholder="Keterangan foto 1..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
                     </div>
-                    <div>
+                    <div id="slotContainer2" class="hidden">
                         <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
                             <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
                             <div id="jurnalSlot2Content">
                                 <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                                <p class="text-sm font-semibold text-slate-500">Foto 2</p>
+                                <p class="text-sm font-semibold text-slate-500">Foto 2 (Rekomendasi)</p>
                                 <p class="text-xs text-slate-400">Tap untuk upload</p>
                             </div>
                         </div>
                         <textarea id="jurnalKeterangan2" placeholder="Keterangan foto 2..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
                     </div>
+                    <div id="slotContainer3" class="hidden">
+                        <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
+                            <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
+                            <div id="jurnalSlot3Content">
+                                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                <p class="text-sm font-semibold text-slate-500">Foto 3 (Opsional)</p>
+                                <p class="text-xs text-slate-400">Tap untuk upload</p>
+                            </div>
+                        </div>
+                        <textarea id="jurnalKeterangan3" placeholder="Keterangan foto 3..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                    </div>
+                    
+                    <button id="btnAddSlot" onclick="tambahSlotJurnal()" class="w-full border-2 border-dashed border-slate-200 text-slate-500 hover:text-primary hover:border-primary hover:bg-blue-50 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i class="ph ph-plus-circle text-lg"></i> Tambah Dokumentasi
+                    </button>
                 </div>
 
                 <button id="btnSubmitJurnal" onclick="submitJurnal()" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2">
                     <i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan
                 </button>
             `;
-            jurnalPhotos = [null, null];
-            fetchJurnal(userData.nisn); // Reload data
+            jurnalPhotos = [null, null, null];
+            visibleJurnalSlots = 1;
+            fetchJurnal(userData.nisn);
         } else {
             showToast(result.message, "error");
         }
