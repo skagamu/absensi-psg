@@ -353,8 +353,8 @@ function updateSubmitVisibility() {
 
 // Absen Logic (Camera, GPS, Form)
 inputStatus.addEventListener('change', (e) => {
-    if (e.target.value === 'Sakit' || e.target.value === 'Izin') { boxAlasan.classList.remove('hidden'); document.getElementById('boxAgenda').classList.add('hidden'); }
-    else { boxAlasan.classList.add('hidden'); inputAlasan.value = ''; document.getElementById('boxAgenda').classList.remove('hidden'); }
+    if (e.target.value === 'Sakit' || e.target.value === 'Izin') { boxAlasan.classList.remove('hidden'); }
+    else { boxAlasan.classList.add('hidden'); inputAlasan.value = ''; }
     updateSubmitVisibility();
 });
 
@@ -666,6 +666,39 @@ function renderJurnal() {
         rangeEl.innerText = `${formatDateIndo(monday)} — ${formatDateIndo(sunday)}`;
     }
     
+    // --- Agenda Harian UI Logic ---
+    const todayStr = getTodayStr();
+    const todayRecord = rekapDataCache.find(r => r.tanggal === todayStr);
+    const agendaContent = document.getElementById('agendaContent');
+    
+    if (agendaContent) {
+        if (!todayRecord) {
+            agendaContent.innerHTML = `<div class="text-center py-4 bg-slate-50 rounded-xl border border-slate-100"><i class="ph ph-warning-circle text-2xl text-amber-500 mb-1"></i><p class="text-sm font-medium text-slate-500">Anda belum absen hari ini.<br>Silakan absen kehadiran terlebih dahulu.</p></div>`;
+        } else if (todayRecord.status !== 'Hadir') {
+            agendaContent.innerHTML = `<div class="text-center py-4 bg-slate-50 rounded-xl border border-slate-100"><i class="ph ph-info text-2xl text-blue-500 mb-1"></i><p class="text-sm font-medium text-slate-500">Status Anda hari ini: ${todayRecord.status}.<br>Tidak perlu mengisi jurnal harian.</p></div>`;
+        } else if (todayRecord.agenda && todayRecord.agenda.trim() !== '') {
+            agendaContent.innerHTML = `
+                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex gap-3">
+                    <div class="w-10 h-10 shrink-0 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600"><i class="ph-fill ph-check-circle text-xl"></i></div>
+                    <div>
+                        <p class="text-sm font-bold text-emerald-800 mb-1">Jurnal Harian Tersimpan!</p>
+                        <p class="text-xs text-emerald-600 italic">"${todayRecord.agenda}"</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Form to fill
+            agendaContent.innerHTML = `
+                <p class="text-xs text-slate-500 mb-2">Silakan isi kegiatan Anda hari ini.</p>
+                <textarea id="inputAgendaHarianBaru" placeholder="Tuliskan deskripsi kegiatan hari ini..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-24 mb-2"></textarea>
+                <button id="btnSubmitAgenda" onclick="submitAgendaHarian()" class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-all shadow-sm">
+                    <i class="ph ph-check-circle text-lg font-bold"></i> Simpan Jurnal Harian
+                </button>
+            `;
+        }
+    }
+    // --------------------------------
+    
     // Check if current week already submitted
     const currentWeekEntry = jurnalDataCache.find(j => j.weekId === weekId);
     const uploadSection = document.getElementById('jurnalUploadSection');
@@ -809,6 +842,36 @@ window.removeJurnalPhoto = removeJurnalPhoto;
 window.submitJurnal = submitJurnal;
 window.openJurnalImageViewer = openJurnalImageViewer;
 
+window.submitAgendaHarian = async function() {
+    const inputEl = document.getElementById('inputAgendaHarianBaru');
+    if(!inputEl) return;
+    const agendaText = inputEl.value.trim();
+    if (!agendaText) return showToast("Mohon isi deskripsi kegiatan hari ini!", "error");
+    
+    const btn = document.getElementById('btnSubmitAgenda');
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Menyimpan...`;
+    
+    try {
+        const payload = { action: "submitAgendaHarian", nisn: userData.nisn, agenda: agendaText };
+        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        const result = await res.json();
+        
+        if (result.status === 'success') {
+            showToast("Jurnal Harian berhasil disimpan! 🎉");
+            fetchRekap(userData.nisn); // Reload all data
+        } else {
+            showToast(result.message, "error");
+            btn.disabled = false;
+            btn.innerHTML = `<i class="ph ph-check-circle text-lg font-bold"></i> Simpan Jurnal Harian`;
+        }
+    } catch (e) {
+        showToast("Koneksi gagal. Coba lagi.", "error");
+        btn.disabled = false;
+        btn.innerHTML = `<i class="ph ph-check-circle text-lg font-bold"></i> Simpan Jurnal Harian`;
+    }
+}
+
 window.deleteAbsenHariIni = async function() {
     if(!confirm("Apakah Anda yakin ingin membatalkan (menghapus) absen hari ini?")) return;
     
@@ -895,10 +958,8 @@ window.deleteJurnal = async function(id) {
 btnSubmit.addEventListener('click', async () => {
     const selectedStatus = inputStatus.value;
     const alasan = inputAlasan.value.trim();
-    const agenda = document.getElementById('inputAgenda').value.trim();
 
     if (selectedStatus === 'Hadir') {
-        if (!agenda) return showToast("Mohon isi Agenda Harian Anda!", "error");
         
         if (!userData.lat || !userData.lng) return showToast("Lokasi GPS belum didapatkan.", "error");
         
@@ -925,7 +986,7 @@ btnSubmit.addEventListener('click', async () => {
     loadingOverlay.classList.remove('hidden');
     
     try {
-        const payload = { action: "absen", nisn: userData.nisn, lat: userData.lat, lng: userData.lng, status: selectedStatus, alasan: alasan, agenda: agenda, photoBase64: userData.photoBase64, gpsHistory: gpsHistory };
+        const payload = { action: "absen", nisn: userData.nisn, lat: userData.lat, lng: userData.lng, status: selectedStatus, alasan: alasan, agenda: "", photoBase64: userData.photoBase64, gpsHistory: gpsHistory };
         const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }});
         const result = await res.json();
         
@@ -936,9 +997,7 @@ btnSubmit.addEventListener('click', async () => {
             // Reset state absen
             inputStatus.value = 'Hadir';
             inputAlasan.value = '';
-            document.getElementById('inputAgenda').value = '';
             boxAlasan.classList.add('hidden');
-            document.getElementById('boxAgenda').classList.remove('hidden');
             if (userData.photoBase64) btnRetake.click();
 
             document.querySelector('[data-target=dashboard]').click(); // Go back to home
