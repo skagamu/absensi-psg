@@ -85,7 +85,8 @@ window.onload = () => {
 function setLoggedInState(nisn, nama) {
     userData.nisn = nisn;
     userData.nama = nama;
-    displayNisn.innerText = nisn;
+    const namaDepan = nama ? nama.split(' ')[0] : nisn;
+    displayNisn.innerText = namaDepan;
     displayNamaLengkap.innerText = nama;
     dashNamaSiswa.innerText = nama;
     
