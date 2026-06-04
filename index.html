@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Absensi PSG SKAGAMU</title>
+    <title>Portal Guru - Absensi PSG</title>
     
-    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E3A8A">
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="./icon.png">
     <link rel="icon" type="image/png" href="./icon.png">
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,8 +23,14 @@
                         'fadeIn': 'fadeIn 0.2s ease-out forwards'
                     },
                     keyframes: {
-                        slideUp: { 'from': { opacity: '0', transform: 'translateY(15px)' }, 'to': { opacity: '1', transform: 'translateY(0)' } },
-                        fadeIn: { 'from': { opacity: '0' }, 'to': { opacity: '1' } }
+                        slideUp: {
+                            'from': { opacity: '0', transform: 'translateY(15px)' },
+                            'to': { opacity: '1', transform: 'translateY(0)' }
+                        },
+                        fadeIn: {
+                            'from': { opacity: '0' },
+                            'to': { opacity: '1' }
+                        }
                     }
                 }
             }
@@ -33,7 +38,6 @@
     </script>
     <style>
         body { background-color: #F1F5F9; }
-        .camera-box { aspect-ratio: 3/4; }
         #toast { transition: bottom 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
         #toast.show { bottom: 20px; }
         .spinner { border-top-color: transparent; animation: spin 1s linear infinite; }
@@ -44,42 +48,6 @@
         .tab-btn { color: #64748B; border-bottom: 2px solid transparent; font-weight: 500; }
 
         /* Jurnal Styles */
-        .jurnal-upload-box {
-            border: 2px dashed #CBD5E1;
-            border-radius: 1rem;
-            padding: 1.5rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: #F8FAFC;
-        }
-        .jurnal-upload-box:hover, .jurnal-upload-box.dragover {
-            border-color: #1E3A8A;
-            background: #EFF6FF;
-        }
-        .jurnal-upload-box.has-image {
-            border-style: solid;
-            border-color: #10B981;
-            background: #F0FDF4;
-            padding: 0.5rem;
-        }
-        .jurnal-img-preview {
-            width: 100%;
-            aspect-ratio: 4/3;
-            object-fit: cover;
-            border-radius: 0.75rem;
-        }
-        .jurnal-week-badge {
-            background: linear-gradient(135deg, #1E3A8A, #3B82F6);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 0.75rem;
-            font-size: 0.75rem;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
         .jurnal-card {
             background: white;
             border: 1px solid #E2E8F0;
@@ -89,18 +57,10 @@
             transition: transform 0.2s ease;
         }
         .jurnal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .jurnal-status-bar {
-            height: 4px;
-            border-radius: 9999px;
-            background: #E2E8F0;
-            overflow: hidden;
-        }
-        .jurnal-status-fill {
-            height: 100%;
-            border-radius: 9999px;
-            transition: width 0.4s ease;
-        }
+        .jurnal-status-bar { height: 4px; border-radius: 9999px; background: #E2E8F0; overflow: hidden; }
+        .jurnal-status-fill { height: 100%; border-radius: 9999px; transition: width 0.4s ease; }
 
+        /* Print/PDF Export Styles */
         @media print {
             body { background: white !important; }
             body * { visibility: hidden; }
@@ -117,20 +77,24 @@
         
         <!-- HEADER -->
         <header class="bg-white px-5 py-4 flex justify-between items-center shadow-sm z-20 shrink-0">
-            <div class="flex items-center gap-3 text-primary font-bold text-xl tracking-tight">
-                <img src="./icon.png" class="w-8 h-8 rounded-lg shadow-sm" alt="Logo">
-                <h1 class="text-slate-800">Absen<span class="text-primary">PSG</span></h1>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <i class="ph-fill ph-chalkboard-teacher text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-800 leading-tight tracking-tight">Portal Guru</h1>
+                    <p id="headerDate" class="text-xs font-medium text-slate-500"></p>
+                </div>
             </div>
             
             <div id="userProfile" class="hidden relative items-center gap-2">
-                <button id="btnProfileMenu" class="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-200 hover:bg-slate-100 transition-all focus:outline-none flex gap-2 items-center px-3">
+                <button id="btnProfileMenu" class="bg-slate-50 p-2 rounded-full text-slate-600 border border-slate-200 hover:bg-slate-100 transition-all focus:outline-none">
                     <i class="ph ph-user text-lg"></i>
-                    <span id="displayNisn" class="text-sm font-bold truncate max-w-[80px]"></span>
                 </button>
                 <div id="dropdownMenu" class="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg hidden z-[60]">
                     <div class="p-3 border-b border-slate-100">
                         <p class="text-xs text-slate-500">Masuk sebagai</p>
-                        <p id="displayNamaLengkap" class="font-bold text-slate-800 truncate"></p>
+                        <p id="displayNamaGuru" class="font-bold text-slate-800 truncate"></p>
                     </div>
                     <div class="p-2">
                         <button id="btnLogout" class="w-full text-left px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2 transition-all font-semibold">
@@ -146,19 +110,16 @@
             <section id="loginSection" class="p-6 flex flex-col justify-center flex-1 animate-slideUp">
                 <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col gap-5">
                     <div class="text-center mb-2">
-                        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Login Siswa</h2>
-                        <p class="text-slate-500 text-sm mt-1">Masukkan NIS dan PIN / Password.</p>
+                        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Login</h2>
+                        <p class="text-slate-500 text-sm mt-1">Masukkan ID Pembimbing & Secret.</p>
                     </div>
                     <div class="relative flex items-center">
                         <i class="ph ph-identification-card absolute left-4 text-slate-400 text-xl"></i>
-                        <input type="number" id="inputNisn" placeholder="Nomor Induk Siswa (NIS)" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-3.5 pl-12 pr-4 outline-none focus:border-primary focus:bg-white transition-all font-medium">
+                        <input type="text" id="inputIdGuru" placeholder="ID Pembimbing" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-3.5 pl-12 pr-4 outline-none focus:border-primary focus:bg-white transition-all font-medium">
                     </div>
-                    <div class="relative flex flex-col mt-3">
-                        <label class="text-xs font-semibold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Tanggal Lahir (Password)</label>
-                        <div class="relative flex items-center">
-                            <i class="ph ph-calendar absolute left-4 text-slate-400 text-xl pointer-events-none"></i>
-                            <input type="date" id="inputTglLahir" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-3.5 pl-12 pr-4 outline-none focus:border-primary focus:bg-white transition-all font-medium appearance-none">
-                        </div>
+                    <div class="relative flex items-center">
+                        <i class="ph ph-lock-key absolute left-4 text-slate-400 text-xl"></i>
+                        <input type="password" id="inputSecret" placeholder="Kata Sandi (Secret)" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-3.5 pl-12 pr-4 outline-none focus:border-primary focus:bg-white transition-all font-medium">
                     </div>
                     <button id="btnLanjut" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2">
                         Masuk <i class="ph ph-arrow-right font-bold"></i>
@@ -166,21 +127,24 @@
                 </div>
             </section>
 
-            <!-- MAIN APP AREA -->
+            <!-- MAIN APP AREA (Hidden until login) -->
             <div id="mainApp" class="hidden flex-col h-full">
                 <!-- TABS -->
                 <nav class="bg-white border-b border-slate-200 flex px-2 pt-2 shrink-0 overflow-x-auto no-scrollbar">
                     <button class="tab-btn active px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="dashboard">
                         <i class="ph ph-squares-four text-lg"></i> Dashboard
                     </button>
-                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="absen">
-                        <i class="ph ph-camera text-lg"></i> Kehadiran
+                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="harian">
+                        <i class="ph ph-calendar-check text-lg"></i> Harian
+                    </button>
+                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="periodik">
+                        <i class="ph ph-table text-lg"></i> Rekap Tabel
+                    </button>
+                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="detail">
+                        <i class="ph ph-user-list text-lg"></i> Detail Siswa
                     </button>
                     <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="jurnal">
                         <i class="ph ph-notebook text-lg"></i> Dokumentasi
-                    </button>
-                    <button class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap flex gap-2 items-center" data-target="rekap">
-                        <i class="ph ph-clock-counter-clockwise text-lg"></i> Riwayat
                     </button>
                 </nav>
 
@@ -188,288 +152,106 @@
                 <div class="flex-1 overflow-y-auto p-4 md:p-5 relative bg-slate-50/50">
                     
                     <!-- LOADING OVERLAY -->
-                    <div id="loadingOverlay" class="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 hidden">
+                    <div id="loadingOverlay" class="absolute inset-0 bg-slate-50 z-50 flex flex-col items-center justify-center gap-3 hidden">
                         <div class="spinner w-8 h-8 border-4 border-slate-200 border-t-primary rounded-full"></div>
                         <p class="text-sm font-medium text-slate-500">Memuat Data...</p>
                     </div>
 
                     <!-- TAB: DASHBOARD -->
-                    <div id="tab-dashboard" class="tab-content animate-fadeIn space-y-5 hidden flex-col">
-                        <div class="bg-gradient-to-br from-primary to-blue-700 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden">
-                            <div class="absolute -right-4 -top-4 opacity-10">
-                                <i class="ph-fill ph-student text-9xl"></i>
-                            </div>
-                            <p class="text-blue-100 text-sm font-medium mb-1">Halo, selamat datang!</p>
-                            <h2 id="dashNamaSiswa" class="text-2xl font-bold line-clamp-1">Nama Siswa</h2>
-                        </div>
-
-                        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex justify-between items-center">
+                    <div id="tab-dashboard" class="tab-content animate-fadeIn space-y-5 hidden">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                             <div>
-                                <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-1">Status Hari Ini</p>
-                                <div class="flex items-center gap-3">
-                                    <p id="dashStatusHariIni" class="text-lg font-bold text-slate-800">Mengecek...</p>
-                                    <button id="btnCancelAbsen" onclick="deleteAbsenHariIni()" class="hidden text-[10px] bg-rose-50 text-rose-600 px-2 py-1 rounded border border-rose-200 font-bold uppercase hover:bg-rose-100 transition-colors cursor-pointer"><i class="ph ph-trash"></i> Batal</button>
-                                </div>
+                                <p class="text-sm font-medium text-slate-500">Total Bimbingan</p>
+                                <p id="dashTotalSiswa" class="text-2xl font-bold text-slate-800">0 <span class="text-sm font-normal text-slate-400">Siswa</span></p>
                             </div>
-                            <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                                <i class="ph-fill ph-calendar-check text-2xl"></i>
+                            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-2xl">
+                                <i class="ph-fill ph-users"></i>
                             </div>
                         </div>
 
                         <div>
-                            <div class="flex justify-between items-end mb-3">
-                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Statistik Anda</h3>
-                                <select id="dashBulanFilter" class="bg-transparent border-none text-xs font-bold text-primary outline-none cursor-pointer">
-                                    <option value="all">Semua Waktu</option>
-                                    <option value="1">Januari</option>
-                                    <option value="2">Februari</option>
-                                    <option value="3">Maret</option>
-                                    <option value="4">April</option>
-                                    <option value="5">Mei</option>
-                                    <option value="6">Juni</option>
-                                    <option value="7">Juli</option>
-                                    <option value="8">Agustus</option>
-                                    <option value="9">September</option>
-                                    <option value="10">Oktober</option>
-                                    <option value="11">November</option>
-                                    <option value="12">Desember</option>
-                                </select>
-                            </div>
+                            <h3 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Kehadiran Hari Ini</h3>
                             <div class="grid grid-cols-2 gap-3">
                                 <div class="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm flex flex-col">
                                     <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-emerald-500"></div><p class="text-xs font-semibold text-slate-500">Hadir</p></div>
-                                    <p id="dashH" class="text-2xl font-bold text-emerald-600">0</p>
+                                    <p id="dashHadir" class="text-2xl font-bold text-emerald-600">0</p>
                                 </div>
                                 <div class="bg-white p-4 rounded-2xl border border-rose-100 shadow-sm flex flex-col">
                                     <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-rose-500"></div><p class="text-xs font-semibold text-slate-500">Sakit</p></div>
-                                    <p id="dashS" class="text-2xl font-bold text-rose-600">0</p>
+                                    <p id="dashSakit" class="text-2xl font-bold text-rose-600">0</p>
                                 </div>
                                 <div class="bg-white p-4 rounded-2xl border border-amber-100 shadow-sm flex flex-col">
                                     <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-amber-500"></div><p class="text-xs font-semibold text-slate-500">Izin</p></div>
-                                    <p id="dashI" class="text-2xl font-bold text-amber-600">0</p>
+                                    <p id="dashIzin" class="text-2xl font-bold text-amber-600">0</p>
                                 </div>
                                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                                    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-slate-400"></div><p class="text-xs font-semibold text-slate-500">Alpha</p></div>
-                                    <p id="dashA" class="text-2xl font-bold text-slate-600">0</p>
+                                    <div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full bg-slate-400"></div><p class="text-xs font-semibold text-slate-500">Belum Absen</p></div>
+                                    <p id="dashBelum" class="text-2xl font-bold text-slate-600">0</p>
                                 </div>
-                            </div>
-                            <div class="mt-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Status Pengisian</h4>
-                                <div class="flex flex-col gap-2">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-sm font-semibold text-slate-700">Agenda Harian</span>
-                                        <span id="dashStatusAgenda" class="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-500 border border-slate-200">Belum terisi</span>
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-sm font-semibold text-slate-700">Dokumentasi Mingguan</span>
-                                        <span id="dashStatusDokumentasi" class="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-500 border border-slate-200">Belum terisi</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors" onclick="document.querySelector('[data-target=rekap]').click()">
-                                <p class="text-sm font-semibold text-primary flex items-center gap-1">Lihat Detail Riwayat <i class="ph ph-arrow-right"></i></p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- TAB: ABSEN (KAMERA & LOKASI) -->
-                    <div id="tab-absen" class="tab-content animate-fadeIn space-y-4 hidden flex-col">
-                        <div id="absenFormContainer" class="space-y-4 flex-col flex">
-                            <!-- CAMERA BOX -->
-                            <div class="camera-box bg-slate-200 rounded-3xl overflow-hidden relative shadow-inner border-2 border-white">
-                            <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
-                            <img id="photo" class="hidden w-full h-full object-cover">
-                            <canvas id="canvas" class="hidden"></canvas>
-                            
-                            <div id="cameraStatus" class="absolute inset-0 flex items-center justify-center bg-slate-800/80 backdrop-blur-sm z-10 text-white flex-col gap-2 p-4 text-center">
-                                <div class="spinner w-8 h-8 border-4 border-slate-400 border-t-white rounded-full"></div>
-                                <p class="font-medium text-sm">Menyiapkan Kamera & Lokasi GPS...</p>
-                            </div>
-                            
-                            <!-- Location Badge -->
-                            <div class="absolute top-3 left-3 right-3 flex justify-center z-10 pointer-events-none">
-                                <div class="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2 max-w-full">
-                                    <div id="locDot" class="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></div>
-                                    <span id="locText" class="text-white text-xs font-medium tracking-wide truncate">Mencari Satelit...</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Capture Button overlay -->
-                            <div class="absolute bottom-5 left-0 right-0 flex justify-center gap-4 z-20">
-                                <button id="btnCapture" disabled class="w-16 h-16 bg-white/30 backdrop-blur-md rounded-full border-4 border-white flex items-center justify-center shadow-lg transition-transform active:scale-90 opacity-50">
-                                    <div class="w-12 h-12 bg-white rounded-full"></div>
-                                </button>
-                                <button id="btnRetake" class="hidden w-16 h-16 bg-rose-500 text-white rounded-full border-4 border-rose-300 flex items-center justify-center shadow-lg transition-transform active:scale-90">
-                                    <i class="ph ph-arrows-clockwise text-2xl font-bold"></i>
-                                </button>
-                            </div>
-                        </div>
+                    <!-- PSG LOCATION INFO -->
+                    <div id="psgInfoSection" class="hidden">
+                        <div id="psgInfoContainer" class="space-y-3"></div>
+                    </div>
 
-                        <!-- FORM ABSEN -->
-                        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 flex flex-col gap-4">
-                            <div class="flex flex-col gap-1.5">
-                                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Keterangan Kehadiran</label>
-                                <select id="inputStatus" class="w-full bg-slate-50 border border-slate-200 text-slate-800 font-semibold text-sm rounded-xl px-4 py-3.5 outline-none focus:border-primary focus:bg-white transition-all appearance-none cursor-pointer">
-                                    <option value="Hadir">✔️ Hadir (H)</option>
-                                    <option value="Izin">ℹ️ Izin (I)</option>
-                                    <option value="Sakit">🤒 Sakit (S)</option>
+                    <!-- TAB: HARIAN -->
+                    <div id="tab-harian" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
+                        <div class="relative shrink-0 no-print">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="searchHarian" placeholder="Cari nama siswa..." class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-xl py-2.5 pl-10 pr-4 outline-none focus:border-primary shadow-sm transition-all font-medium">
+                        </div>
+                        <div id="listHarian" class="flex-1 space-y-3 pb-4"></div>
+                    </div>
+
+                    <!-- TAB: PERIODIK -->
+                    <div id="tab-periodik" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
+                        <div class="flex flex-col gap-2 shrink-0 no-print">
+                            <div class="flex gap-2">
+                                <select id="filterPeriodik" class="flex-1 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm cursor-pointer">
+                                    <option value="week">Mingguan</option>
+                                    <option value="month">Bulanan</option>
+                                    <option value="all">Semua Waktu (Summary)</option>
                                 </select>
-                            </div>
-                            
-                            <div class="flex flex-col gap-1.5 hidden" id="boxAlasan">
-                                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Surat / Alasan Tambahan</label>
-                                <textarea id="inputAlasan" placeholder="Tulis alasan izin/sakit..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-20"></textarea>
-                            </div>
-
-                            <button id="btnSubmit" disabled class="w-full bg-slate-300 text-slate-500 font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all mt-2">
-                                Silakan Ambil Foto <i class="ph ph-camera text-lg"></i>
-                            </button>
-                        </div>
-                        </div>
-
-                        <!-- SUCCESS CONTAINER (Hidden by default) -->
-                        <div id="absenSuccessContainer" class="hidden flex-col gap-4">
-                            <div class="bg-emerald-50 border border-emerald-100 rounded-3xl p-5 shadow-sm text-center relative overflow-hidden">
-                                <div class="absolute -right-4 -bottom-4 opacity-10">
-                                    <i class="ph-fill ph-check-circle text-[100px] text-emerald-600"></i>
-                                </div>
-                                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 relative z-10">
-                                    <i class="ph-fill ph-check-circle text-4xl"></i>
-                                </div>
-                                <h3 class="text-lg font-bold text-slate-800 mb-1 relative z-10">Berhasil Absen!</h3>
-                                <p class="text-sm text-slate-500 mb-4 relative z-10">Anda sudah mencatatkan kehadiran hari ini.</p>
-                                <button onclick="deleteAbsenHariIni()" class="relative z-10 mx-auto bg-white hover:bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border border-slate-200 hover:border-rose-200 shadow-sm">
-                                    <i class="ph ph-arrows-clockwise text-lg"></i> Ulangi Absensi
+                                <button id="btnExportPdf" class="bg-primary text-white p-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5 text-sm font-semibold hover:bg-blue-900 transition-colors" title="Cetak PDF">
+                                    <i class="ph ph-printer text-lg"></i>
                                 </button>
                             </div>
-                            
-                            <!-- Agenda Harian Section -->
-                            <div id="agendaHarianSection" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-3">
-                                <div class="flex items-center justify-between mb-1">
-                                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                        <i class="ph ph-note-pencil text-primary text-lg"></i> Agenda Harian
-                                    </h3>
-                                </div>
-                                <div id="agendaContent">
-                                    <!-- Rendered dynamically in app.js -->
-                                </div>
-                            </div>
+                            <input type="week" id="weekSelector" class="w-full bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm">
+                            <input type="month" id="monthSelector" class="hidden w-full bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm">
                         </div>
+                        <div class="relative shrink-0 no-print">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="searchPeriodik" placeholder="Filter nama siswa..." class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-xl py-2.5 pl-10 pr-4 outline-none focus:border-primary shadow-sm transition-all font-medium">
+                        </div>
+                        <div id="tablePeriodik" class="flex-1 pb-4"></div>
                     </div>
 
-                    <!-- TAB: JURNAL MINGGUAN -->
-                    <div id="tab-jurnal" class="tab-content animate-fadeIn space-y-4 hidden flex-col">
-                        <!-- Week Info Banner -->
-                        <div class="bg-gradient-to-br from-indigo-600 to-blue-500 rounded-2xl p-4 text-white relative overflow-hidden">
-                            <div class="absolute -right-6 -bottom-6 opacity-10">
-                                <i class="ph-fill ph-notebook text-[120px]"></i>
-                            </div>
-                            <div class="flex items-center gap-2 mb-2">
-                                <i class="ph-fill ph-calendar-blank text-lg text-blue-200"></i>
-                                <span class="text-blue-100 text-xs font-bold uppercase tracking-widest">Dokumentasi Minggu Ini</span>
-                            </div>
-                            <p id="jurnalWeekRange" class="text-lg font-bold">Memuat...</p>
-                            <div class="mt-3 flex items-center gap-3">
-                                <div class="jurnal-status-bar flex-1">
-                                    <div id="jurnalProgressBar" class="jurnal-status-fill bg-emerald-400" style="width: 0%"></div>
-                                </div>
-                                <span id="jurnalProgressText" class="text-xs font-bold text-blue-100">0/2</span>
-                            </div>
-                        </div>
-
-                        <!-- Upload Section (Dokumentasi Mingguan) -->
-                        <div id="jurnalUploadSection" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                    <i class="ph ph-camera-plus text-primary text-lg"></i> Upload Dokumentasi
-                                </h3>
-                                <span id="jurnalUploadCount" class="text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg">0/2 foto</span>
-                            </div>
-                            
-                            <!-- Photo Upload Slots -->
-                            <div class="grid grid-cols-1 gap-4" id="jurnalPhotoSlots">
-                                <!-- Slot 1 -->
-                                <div id="slotContainer1">
-                                    <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
-                                        <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
-                                        <div id="jurnalSlot1Content">
-                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                                            <p class="text-sm font-semibold text-slate-500">Foto 1</p>
-                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
-                                        </div>
-                                    </div>
-                                    <textarea id="jurnalKeterangan1" placeholder="Keterangan foto 1..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
-                                </div>
-                                <!-- Slot 2 -->
-                                <div id="slotContainer2" class="hidden">
-                                    <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
-                                        <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
-                                        <div id="jurnalSlot2Content">
-                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                                            <p class="text-sm font-semibold text-slate-500">Foto 2 (Rekomendasi)</p>
-                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
-                                        </div>
-                                    </div>
-                                    <textarea id="jurnalKeterangan2" placeholder="Keterangan foto 2..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
-                                </div>
-                                <!-- Slot 3 -->
-                                <div id="slotContainer3" class="hidden">
-                                    <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
-                                        <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
-                                        <div id="jurnalSlot3Content">
-                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                                            <p class="text-sm font-semibold text-slate-500">Foto 3 (Opsional)</p>
-                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
-                                        </div>
-                                    </div>
-                                    <textarea id="jurnalKeterangan3" placeholder="Keterangan foto 3..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
-                                </div>
-                                
-                                <button id="btnAddSlot" onclick="tambahSlotJurnal()" class="w-full border-2 border-dashed border-slate-200 text-slate-500 hover:text-primary hover:border-primary hover:bg-blue-50 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all">
-                                    <i class="ph ph-plus-circle text-lg"></i> Tambah Dokumentasi
-                                </button>
-                            </div>
-
-                            <!-- Submit Button -->
-                            <button id="btnSubmitJurnal" onclick="submitJurnal()" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2">
-                                <i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan
-                            </button>
-                        </div>
-
-                        <!-- Riwayat Jurnal -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <i class="ph ph-clock-counter-clockwise text-primary text-lg"></i> Riwayat Dokumentasi
-                            </h3>
-                            <div id="jurnalHistory" class="space-y-3 pb-4">
-                                <div class="text-center text-slate-400 text-sm py-6 font-medium">Memuat riwayat jurnal...</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB: REKAP RIWAYAT -->
-                    <div id="tab-rekap" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
+                    <!-- TAB: DETAIL SISWA -->
+                    <div id="tab-detail" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
                         <div class="flex gap-2 shrink-0 no-print">
-                            <select id="bulanRekap" class="flex-1 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm cursor-pointer">
-                                <option value="all">Semua Bulan</option>
-                                <option value="1">Januari</option>
-                                <option value="2">Februari</option>
-                                <option value="3">Maret</option>
-                                <option value="4">April</option>
-                                <option value="5">Mei</option>
-                                <option value="6">Juni</option>
-                                <option value="7">Juli</option>
-                                <option value="8">Agustus</option>
-                                <option value="9">September</option>
-                                <option value="10">Oktober</option>
-                                <option value="11">November</option>
-                                <option value="12">Desember</option>
+                            <select id="selectDetailSiswa" class="flex-1 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm cursor-pointer">
+                                <option value="">-- Pilih Siswa --</option>
                             </select>
-                            <button id="btnExportPdf" class="bg-primary text-white p-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5 text-sm font-semibold hover:bg-blue-900 transition-colors" title="Cetak PDF">
-                                <i class="ph ph-printer text-lg"></i>
-                            </button>
+                            <input type="month" id="detailMonthSelector" class="w-36 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-2 outline-none focus:border-primary shadow-sm">
                         </div>
-                        <div id="rekapContainer" class="flex-1 pb-4 flex flex-col gap-3"></div>
+                        <!-- PSG Info for selected student -->
+                        <div id="detailPsgInfo" class="hidden"></div>
+                        <div id="listDetailSiswa" class="flex-1 space-y-3 pb-4"></div>
+                    </div>
+
+                    <!-- TAB: JURNAL -->
+                    <div id="tab-jurnal" class="tab-content animate-fadeIn space-y-4 hidden flex-col h-full">
+                        <div class="flex gap-2 shrink-0 no-print">
+                            <select id="selectJurnalSiswa" class="flex-1 bg-white border border-slate-200 text-slate-700 font-medium text-sm rounded-xl px-3 py-2.5 outline-none focus:border-primary shadow-sm cursor-pointer">
+                                <option value="all">Semua Siswa</option>
+                            </select>
+                        </div>
+                        <div id="jurnalGuruContainer" class="flex-1 space-y-3 pb-4">
+                            <div class="text-center text-slate-400 text-sm py-6 font-medium">Memuat data jurnal...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -484,12 +266,17 @@
 
     <script src="app.js"></script>
     <script>
+        // Tanggal di header
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('headerDate').innerText = now.toLocaleDateString('id-ID', options);
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js');
             });
         }
-        
+
         window.showToast = function(message, type = "success") {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
