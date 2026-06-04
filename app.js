@@ -621,6 +621,69 @@ window.tambahSlotJurnal = function() {
     }
 }
 
+window.editJurnal = function(id) {
+    const entry = jurnalDataCache.find(j => j.id === id);
+    if (!entry) return;
+    
+    document.getElementById('jurnalSuccessContainer').classList.add('hidden');
+    document.getElementById('jurnalUploadSection').classList.remove('hidden');
+    
+    let ketParsed = ["", "", ""];
+    if (entry.keterangan) {
+        const lines = entry.keterangan.split('\n\n');
+        for (let line of lines) {
+            if (line.startsWith('Foto 1: ')) ketParsed[0] = line.substring(8);
+            else if (line.startsWith('Foto 2: ')) ketParsed[1] = line.substring(8);
+            else if (line.startsWith('Foto 3: ')) ketParsed[2] = line.substring(8);
+            else ketParsed[0] += (ketParsed[0] ? "\n" : "") + line;
+        }
+    }
+    
+    jurnalPhotos = [null, null, null];
+    visibleJurnalSlots = entry.photoUrls.length || 1;
+    if (visibleJurnalSlots > 3) visibleJurnalSlots = 3;
+    
+    for (let i = 1; i <= 3; i++) {
+        const slotC = document.getElementById(`slotContainer${i}`);
+        if (i <= visibleJurnalSlots) {
+            if (slotC) slotC.classList.remove('hidden');
+            const url = entry.photoUrls[i-1];
+            if (url) {
+                jurnalPhotos[i-1] = url;
+                const slot = document.getElementById(`jurnalSlot${i}`);
+                const content = document.getElementById(`jurnalSlot${i}Content`);
+                slot.classList.add('has-image');
+                content.innerHTML = `
+                    <img src="${url}" class="jurnal-img-preview" alt="Foto ${i}">
+                    <div class="flex items-center justify-between mt-2 px-1">
+                        <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Foto Lama</span>
+                        <button onclick="event.stopPropagation(); removeJurnalPhoto(${i})" class="text-xs text-rose-500 font-semibold hover:text-rose-700 flex items-center gap-1">
+                            <i class="ph ph-trash"></i> Hapus
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            if (slotC) slotC.classList.add('hidden');
+        }
+        
+        const ketEl = document.getElementById(`jurnalKeterangan${i}`);
+        if (ketEl) ketEl.value = ketParsed[i-1];
+    }
+    
+    if (visibleJurnalSlots >= 3) {
+        document.getElementById('btnAddSlot').classList.add('hidden');
+    } else {
+        document.getElementById('btnAddSlot').classList.remove('hidden');
+    }
+    
+    updateJurnalUploadCount();
+    
+    const btnSubmit = document.getElementById('btnSubmitJurnal');
+    btnSubmit.dataset.editId = id;
+    btnSubmit.innerHTML = `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan`;
+};
+
 async function submitJurnal() {
     const photos = [];
     const ketLines = [];
@@ -630,15 +693,18 @@ async function submitJurnal() {
         let ketEl = document.getElementById(`jurnalKeterangan${i}`);
         let ket = ketEl ? ketEl.value.trim() : "";
         
-        if (!p) {
-            return showToast(`Mohon upload Foto ${i}!`, "error");
+        // If a slot has either a photo or text, require BOTH
+        if (p || ket) {
+            if (!p) return showToast(`Mohon upload Foto pada slot ${i}!`, "error");
+            if (!ket) return showToast(`Mohon isi keterangan untuk Foto pada slot ${i}!`, "error");
+            
+            photos.push(p);
+            ketLines.push(`Foto ${photos.length}: ${ket}`);
         }
-        if (!ket) {
-            return showToast(`Mohon isi keterangan untuk Foto ${i}!`, "error");
-        }
-        
-        photos.push(p);
-        ketLines.push(`Foto ${i}: ${ket}`);
+    }
+    
+    if (photos.length === 0) {
+        return showToast("Mohon upload setidaknya 1 dokumentasi!", "error");
     }
     
     const keterangan = ketLines.join('\n\n');
@@ -646,26 +712,32 @@ async function submitJurnal() {
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
     
-    // Check if already submitted this week
-    const existingEntry = jurnalDataCache.find(j => j.weekId === weekId);
-    if (existingEntry) {
-        return showToast("Jurnal minggu ini sudah dikirim!", "error");
+    const btn = document.getElementById('btnSubmitJurnal');
+    const isEditMode = !!btn.dataset.editId;
+    const editId = btn.dataset.editId;
+    
+    // Check if already submitted this week (only if NOT editing)
+    if (!isEditMode) {
+        const existingEntry = jurnalDataCache.find(j => j.weekId === weekId);
+        if (existingEntry) {
+            return showToast("Jurnal minggu ini sudah dikirim!", "error");
+        }
     }
     
-    const btn = document.getElementById('btnSubmitJurnal');
     btn.disabled = true;
-    btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Mengirim...`;
+    btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Menyimpan...`;
     loadingOverlay.classList.remove('hidden');
     
     try {
         const payload = {
-            action: "submitJurnal",
+            action: isEditMode ? "editJurnal" : "submitJurnal",
+            id: isEditMode ? editId : undefined,
             nisn: userData.nisn,
             weekId: weekId,
             weekStart: `${monday.getDate().toString().padStart(2,'0')}/${(monday.getMonth()+1).toString().padStart(2,'0')}/${monday.getFullYear()}`,
             weekEnd: `${sunday.getDate().toString().padStart(2,'0')}/${(sunday.getMonth()+1).toString().padStart(2,'0')}/${sunday.getFullYear()}`,
             keterangan: keterangan,
-            photos: photos // Array of base64 strings
+            photos: photos // Array of base64 strings or URLs
         };
         
         const res = await fetch(GOOGLE_SCRIPT_URL, {
@@ -674,9 +746,8 @@ async function submitJurnal() {
             headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
         const result = await res.json();
-        
-        if (result.status === 'success') {
-            showToast("Dokumentasi berhasil dikirim! 🎉");
+             if (result.status === 'success') {
+            showToast(isEditMode ? "Dokumentasi berhasil diperbarui! 🎉" : "Dokumentasi berhasil dikirim! 🎉");
             // Reset form
             jurnalPhotos = [null, null, null];
             visibleJurnalSlots = 1;
@@ -690,16 +761,21 @@ async function submitJurnal() {
                 }
             }
             document.getElementById('btnAddSlot').classList.remove('hidden');
+            delete btn.dataset.editId;
+            btn.innerHTML = `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
+            
             // Refresh data
             fetchJurnal(userData.nisn);
         } else {
             showToast(result.message, "error");
+            btn.disabled = false;
+            btn.innerHTML = isEditMode ? `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan` : `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
         }
     } catch (e) {
-        showToast("Gagal mengirim jurnal. Periksa koneksi.", "error");
-    } finally {
+        showToast("Koneksi gagal. Coba lagi.", "error");
         btn.disabled = false;
-        btn.innerHTML = `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Jurnal Minggu Ini`;
+        btn.innerHTML = isEditMode ? `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan` : `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
+    } finally {
         loadingOverlay.classList.add('hidden');
     }
 }
@@ -766,22 +842,31 @@ function renderJurnal() {
     // Check if current week already submitted
     const currentWeekEntry = jurnalDataCache.find(j => j.weekId === weekId);
     const uploadSection = document.getElementById('jurnalUploadSection');
+    const successContainer = document.getElementById('jurnalSuccessContainer');
     
     if (currentWeekEntry) {
-        // Already submitted - show confirmation
-        uploadSection.innerHTML = `
-            <div class="text-center py-6">
-                <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <i class="ph-fill ph-check-circle text-4xl text-emerald-500"></i>
+        if(uploadSection) uploadSection.classList.add('hidden');
+        if(successContainer) {
+            successContainer.classList.remove('hidden');
+            successContainer.innerHTML = `
+                <div class="text-center py-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i class="ph-fill ph-check-circle text-4xl text-emerald-500"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Jurnal Terkirim!</h3>
+                    <p class="text-sm text-slate-500">Jurnal minggu ini sudah berhasil dikirim pada ${currentWeekEntry.waktu || 'sebelumnya'}.</p>
+                    <p class="text-xs text-slate-400 mt-2">${currentWeekEntry.photoCount || 0} foto • ${currentWeekEntry.keterangan ? currentWeekEntry.keterangan.substring(0, 60) + '...' : ''}</p>
+                    <div class="flex items-center justify-center gap-3 mt-4">
+                        <button onclick="editJurnal('${currentWeekEntry.id}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border border-blue-200">
+                            <i class="ph ph-pencil-simple text-lg"></i> Edit
+                        </button>
+                        <button onclick="deleteJurnal('${currentWeekEntry.id}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 border border-rose-200">
+                            <i class="ph ph-trash text-lg"></i> Hapus
+                        </button>
+                    </div>
                 </div>
-                <h3 class="text-lg font-bold text-slate-800 mb-1">Jurnal Terkirim!</h3>
-                <p class="text-sm text-slate-500">Jurnal minggu ini sudah berhasil dikirim pada ${currentWeekEntry.waktu || 'sebelumnya'}.</p>
-                <p class="text-xs text-slate-400 mt-2">${currentWeekEntry.photoCount || 0} foto • ${currentWeekEntry.keterangan ? currentWeekEntry.keterangan.substring(0, 60) + '...' : ''}</p>
-                <button onclick="deleteJurnal('${currentWeekEntry.id}')" class="mt-4 bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 mx-auto border border-rose-200">
-                    <i class="ph ph-trash"></i> Hapus & Upload Ulang
-                </button>
-            </div>
-        `;
+            `;
+        }
         // Update progress
         const count = currentWeekEntry.photoCount || 0;
         const progressBar = document.getElementById('jurnalProgressBar');
@@ -789,6 +874,8 @@ function renderJurnal() {
         if (progressBar) progressBar.style.width = `${(count / 2) * 100}%`;
         if (progressText) progressText.innerText = `${count}/2`;
     } else {
+        if(successContainer) successContainer.classList.add('hidden');
+        if(uploadSection) uploadSection.classList.remove('hidden');
         updateJurnalUploadCount();
     }
     
