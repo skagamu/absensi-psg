@@ -102,17 +102,14 @@ function setLoggedInState(nisn, nama) {
 btnLanjut.addEventListener('click', async () => {
     const nisn = inputNisn.value.trim();
     const tglLahirRaw = inputTglLahir.value;
-    if (!nisn || !tglLahirRaw) return showToast("Mohon masukkan NISN dan Tanggal Lahir", "error");
-
-    const [year, month, day] = tglLahirRaw.split('-');
-    const tglLahirFormatted = `${day}/${month}/${year}`;
+    if (!nisn || !tglLahirRaw) return showToast("Mohon masukkan NIS dan PIN/Password", "error");
 
     const originalText = btnLanjut.innerHTML;
     btnLanjut.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Memverifikasi...`;
     btnLanjut.disabled = true;
 
     try {
-        const payload = { action: "login", nisn: nisn, tglLahir: tglLahirFormatted };
+        const payload = { action: "login", nisn: nisn, tglLahir: tglLahirRaw };
         const res = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
@@ -224,6 +221,32 @@ function renderDashboard() {
         if (btnCancelAbsen) btnCancelAbsen.classList.add('hidden');
     }
 
+    const dashStatusAgenda = document.getElementById('dashStatusAgenda');
+    if (todayRecord && todayRecord.agenda && todayRecord.agenda.trim() !== '') {
+        dashStatusAgenda.innerText = "Sudah terisi";
+        dashStatusAgenda.className = "text-xs font-bold px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200";
+    } else {
+        dashStatusAgenda.innerText = "Belum terisi";
+        dashStatusAgenda.className = "text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-500 border border-slate-200";
+    }
+
+    const weekId = getWeekId(new Date());
+    const dashStatusDokumentasi = document.getElementById('dashStatusDokumentasi');
+    const currentWeekEntry = jurnalDataCache.find(j => j.weekId === weekId);
+    if (currentWeekEntry) {
+        const c = currentWeekEntry.photoCount || 0;
+        if (c >= 2) {
+            dashStatusDokumentasi.innerText = "Sudah terisi 2 foto";
+            dashStatusDokumentasi.className = "text-xs font-bold px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200";
+        } else {
+            dashStatusDokumentasi.innerText = "Baru satu foto";
+            dashStatusDokumentasi.className = "text-xs font-bold px-2 py-1 rounded bg-amber-50 text-amber-600 border border-amber-200";
+        }
+    } else {
+        dashStatusDokumentasi.innerText = "Belum terisi";
+        dashStatusDokumentasi.className = "text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-500 border border-slate-200";
+    }
+
     const filter = dashBulanFilter.value;
     let H=0, S=0, I=0, A=0;
     
@@ -292,7 +315,7 @@ function renderRekap() {
                     <span class="text-slate-800 font-semibold text-sm truncate">${item.tanggal}</span>
                     <span class="text-[10px] border px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${badgeColor}">${item.status}</span>
                 </div>
-                <div class="text-slate-500 text-xs font-medium truncate">${item.waktu} ${item.alasan ? '• ' + item.alasan : ''}</div>
+                <div class="text-slate-500 text-xs font-medium truncate">${item.waktu} ${item.alasan ? '• ' + item.alasan : ''} ${item.agenda ? '• Agenda: ' + item.agenda : ''}</div>
             </div>
         </div>`;
     });
@@ -329,8 +352,8 @@ function updateSubmitVisibility() {
 
 // Absen Logic (Camera, GPS, Form)
 inputStatus.addEventListener('change', (e) => {
-    if (e.target.value === 'Sakit' || e.target.value === 'Izin') boxAlasan.classList.remove('hidden');
-    else { boxAlasan.classList.add('hidden'); inputAlasan.value = ''; }
+    if (e.target.value === 'Sakit' || e.target.value === 'Izin') { boxAlasan.classList.remove('hidden'); document.getElementById('boxAgenda').classList.add('hidden'); }
+    else { boxAlasan.classList.add('hidden'); inputAlasan.value = ''; document.getElementById('boxAgenda').classList.remove('hidden'); }
     updateSubmitVisibility();
 });
 
@@ -441,7 +464,7 @@ btnRetake.addEventListener('click', () => {
 });
 
 // ===== JURNAL MINGGUAN LOGIC =====
-let jurnalPhotos = [null, null, null]; // base64 data for 3 slots
+let jurnalPhotos = [null, null]; // base64 data for 2 slots
 let jurnalDataCache = []; // cached jurnal entries from server
 
 // Get current week's Monday and Sunday (Mon 00:00 - Sun 23:59)
@@ -545,21 +568,25 @@ function updateJurnalUploadCount() {
     const progressBar = document.getElementById('jurnalProgressBar');
     const progressText = document.getElementById('jurnalProgressText');
     
-    if (countEl) countEl.innerText = `${count}/3 foto`;
-    if (progressBar) progressBar.style.width = `${(count / 3) * 100}%`;
-    if (progressText) progressText.innerText = `${count}/3`;
+    if (countEl) countEl.innerText = `${count}/2 foto`;
+    if (progressBar) progressBar.style.width = `${(count / 2) * 100}%`;
+    if (progressText) progressText.innerText = `${count}/2`;
 }
 
 async function submitJurnal() {
     const photos = jurnalPhotos.filter(p => p !== null);
-    const keterangan = document.getElementById('jurnalKeterangan').value.trim();
+    const ket1 = document.getElementById('jurnalKeterangan1').value.trim();
+    const ket2 = document.getElementById('jurnalKeterangan2').value.trim();
     
-    if (photos.length === 0) {
-        return showToast("Upload minimal 1 foto dokumentasi!", "error");
+    if (photos.length !== 2) {
+        return showToast("Mohon upload kedua foto dokumentasi (Foto 1 dan Foto 2)!", "error");
     }
-    if (!keterangan) {
-        return showToast("Tulis keterangan kegiatan minggu ini!", "error");
+    
+    if (!ket1 || !ket2) {
+        return showToast("Mohon isi keterangan untuk kedua foto dokumentasi!", "error");
     }
+
+    const keterangan = `Foto 1: ${ket1}\n\nFoto 2: ${ket2}`;
     
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
@@ -594,11 +621,12 @@ async function submitJurnal() {
         const result = await res.json();
         
         if (result.status === 'success') {
-            showToast("Jurnal berhasil dikirim! 🎉");
+            showToast("Dokumentasi berhasil dikirim! 🎉");
             // Reset form
-            jurnalPhotos = [null, null, null];
-            for (let i = 1; i <= 3; i++) removeJurnalPhoto(i);
-            document.getElementById('jurnalKeterangan').value = '';
+            jurnalPhotos = [null, null];
+            for (let i = 1; i <= 2; i++) removeJurnalPhoto(i);
+            document.getElementById('jurnalKeterangan1').value = '';
+            document.getElementById('jurnalKeterangan2').value = '';
             // Refresh data
             fetchJurnal(userData.nisn);
         } else {
@@ -620,6 +648,7 @@ async function fetchJurnal(nisn) {
         if (result.status === 'success') {
             jurnalDataCache = result.data || [];
             renderJurnal();
+            renderDashboard();
         }
     } catch (e) {
         console.error("Gagal load jurnal", e);
@@ -659,8 +688,8 @@ function renderJurnal() {
         const count = currentWeekEntry.photoCount || 0;
         const progressBar = document.getElementById('jurnalProgressBar');
         const progressText = document.getElementById('jurnalProgressText');
-        if (progressBar) progressBar.style.width = `${(count / 3) * 100}%`;
-        if (progressText) progressText.innerText = `${count}/3`;
+        if (progressBar) progressBar.style.width = `${(count / 2) * 100}%`;
+        if (progressText) progressText.innerText = `${count}/2`;
     } else {
         updateJurnalUploadCount();
     }
@@ -679,14 +708,14 @@ function renderJurnal() {
     sorted.forEach((entry, idx) => {
         const isCurrentWeek = entry.weekId === weekId;
         const photoCount = entry.photoCount || 0;
-        const progressPct = Math.round((photoCount / 3) * 100);
-        const progressColor = photoCount >= 3 ? 'bg-emerald-500' : photoCount >= 2 ? 'bg-amber-500' : 'bg-rose-500';
+        const progressPct = Math.round((photoCount / 2) * 100);
+        const progressColor = photoCount >= 2 ? 'bg-emerald-500' : 'bg-amber-500';
         
         // Build photo gallery HTML
         let photosHtml = '';
         const photoUrls = entry.photoUrls || [];
         if (photoUrls.length > 0) {
-            photosHtml = `<div class="grid grid-cols-3 gap-2 mt-3">`;
+            photosHtml = `<div class="grid grid-cols-2 gap-2 mt-3">`;
             photoUrls.forEach((url, i) => {
                 let thumbUrl = url;
                 if (url && url.includes('drive.google.com/file/d/')) {
@@ -721,7 +750,7 @@ function renderJurnal() {
                     <div>
                         <div class="flex items-center gap-2 mb-1">
                             ${isCurrentWeek ? '<span class="text-[10px] bg-primary text-white px-2 py-0.5 rounded-md font-bold uppercase">Minggu Ini</span>' : ''}
-                            <span class="text-[10px] ${progressColor.replace('bg-','text-').replace('500','600')} ${progressColor.replace('500','50')} border ${progressColor.replace('bg-','border-').replace('500','200')} px-2 py-0.5 rounded-md font-bold">${photoCount}/3 Foto</span>
+                            <span class="text-[10px] ${progressColor.replace('bg-','text-').replace('500','600')} ${progressColor.replace('500','50')} border ${progressColor.replace('bg-','border-').replace('500','200')} px-2 py-0.5 rounded-md font-bold">${photoCount}/2 Foto</span>
                         </div>
                         <p class="text-sm font-bold text-slate-800">${entry.weekStart || ''} — ${entry.weekEnd || ''}</p>
                     </div>
@@ -818,46 +847,39 @@ window.deleteJurnal = async function(id) {
                     <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                         <i class="ph ph-camera-plus text-primary text-lg"></i> Upload Dokumentasi
                     </h3>
-                    <span id="jurnalUploadCount" class="text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg">0/3 foto</span>
+                    <span id="jurnalUploadCount" class="text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg">0/2 foto</span>
                 </div>
                 
-                <div class="grid grid-cols-1 gap-3" id="jurnalPhotoSlots">
-                    <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
-                        <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
-                        <div id="jurnalSlot1Content">
-                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                            <p class="text-sm font-semibold text-slate-500">Foto 1</p>
-                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                <div class="grid grid-cols-1 gap-4" id="jurnalPhotoSlots">
+                    <div>
+                        <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
+                            <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
+                            <div id="jurnalSlot1Content">
+                                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                <p class="text-sm font-semibold text-slate-500">Foto 1</p>
+                                <p class="text-xs text-slate-400">Tap untuk upload</p>
+                            </div>
                         </div>
+                        <textarea id="jurnalKeterangan1" placeholder="Keterangan foto 1..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
                     </div>
-                    <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
-                        <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
-                        <div id="jurnalSlot2Content">
-                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                            <p class="text-sm font-semibold text-slate-500">Foto 2</p>
-                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                    <div>
+                        <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
+                            <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
+                            <div id="jurnalSlot2Content">
+                                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                <p class="text-sm font-semibold text-slate-500">Foto 2</p>
+                                <p class="text-xs text-slate-400">Tap untuk upload</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
-                        <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
-                        <div id="jurnalSlot3Content">
-                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                            <p class="text-sm font-semibold text-slate-500">Foto 3</p>
-                            <p class="text-xs text-slate-400">Tap untuk upload</p>
-                        </div>
+                        <textarea id="jurnalKeterangan2" placeholder="Keterangan foto 2..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Keterangan / Kegiatan Minggu Ini</label>
-                    <textarea id="jurnalKeterangan" placeholder="Tuliskan kegiatan yang dilakukan selama minggu ini di tempat PSG..." class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-3 outline-none focus:border-primary focus:bg-white transition-all resize-none h-24"></textarea>
-                </div>
-
-                <button id="btnSubmitJurnal" onclick="submitJurnal()" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm">
-                    <i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Jurnal Minggu Ini
+                <button id="btnSubmitJurnal" onclick="submitJurnal()" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2">
+                    <i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan
                 </button>
             `;
-            jurnalPhotos = [null, null, null];
+            jurnalPhotos = [null, null];
             fetchJurnal(userData.nisn); // Reload data
         } else {
             showToast(result.message, "error");
@@ -872,8 +894,11 @@ window.deleteJurnal = async function(id) {
 btnSubmit.addEventListener('click', async () => {
     const selectedStatus = inputStatus.value;
     const alasan = inputAlasan.value.trim();
+    const agenda = document.getElementById('inputAgenda').value.trim();
 
     if (selectedStatus === 'Hadir') {
+        if (!agenda) return showToast("Mohon isi Agenda Harian Anda!", "error");
+        
         if (!userData.lat || !userData.lng) return showToast("Lokasi GPS belum didapatkan.", "error");
         
         // Cek pengumpulan sampel GPS
@@ -899,7 +924,7 @@ btnSubmit.addEventListener('click', async () => {
     loadingOverlay.classList.remove('hidden');
     
     try {
-        const payload = { action: "absen", nisn: userData.nisn, lat: userData.lat, lng: userData.lng, status: selectedStatus, alasan: alasan, photoBase64: userData.photoBase64, gpsHistory: gpsHistory };
+        const payload = { action: "absen", nisn: userData.nisn, lat: userData.lat, lng: userData.lng, status: selectedStatus, alasan: alasan, agenda: agenda, photoBase64: userData.photoBase64, gpsHistory: gpsHistory };
         const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }});
         const result = await res.json();
         
@@ -910,7 +935,9 @@ btnSubmit.addEventListener('click', async () => {
             // Reset state absen
             inputStatus.value = 'Hadir';
             inputAlasan.value = '';
+            document.getElementById('inputAgenda').value = '';
             boxAlasan.classList.add('hidden');
+            document.getElementById('boxAgenda').classList.remove('hidden');
             if (userData.photoBase64) btnRetake.click();
 
             document.querySelector('[data-target=dashboard]').click(); // Go back to home
