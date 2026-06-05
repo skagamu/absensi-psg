@@ -65,13 +65,13 @@ const getTodayStr = () => {
 };
 function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
     var R = 6371000;
-    var dLat = deg2rad(lat2-lat1);
-    var dLon = deg2rad(lon2-lon1); 
-    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    var dLat = deg2rad(lat2 - lat1);
+    var dLon = deg2rad(lon2 - lon1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
-function deg2rad(deg) { return deg * (Math.PI/180); }
+function deg2rad(deg) { return deg * (Math.PI / 180); }
 
 // Init
 window.onload = () => {
@@ -89,11 +89,11 @@ function setLoggedInState(nisn, nama) {
     displayNisn.innerText = namaDepan;
     displayNamaLengkap.innerText = nama;
     dashNamaSiswa.innerText = nama;
-    
+
     userProfile.style.display = 'flex';
     sectionLogin.style.display = 'none';
     mainApp.style.display = 'flex';
-    
+
     switchTab('dashboard');
     fetchRekap(nisn);
     fetchJurnal(nisn);
@@ -115,7 +115,7 @@ btnLanjut.addEventListener('click', async () => {
             method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
         const result = await res.json();
-        
+
         if (result.status === 'success') {
             localStorage.setItem('nisn_pkl', nisn);
             if (result.nama) localStorage.setItem('nama_pkl', result.nama);
@@ -152,29 +152,29 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         e.currentTarget.classList.add('active');
         const nextTab = e.currentTarget.getAttribute('data-target');
-        
+
         if (currentTab === 'absen' && nextTab !== 'absen') {
             stopCamera();
             if (gpsInterval) clearTimeout(gpsInterval);
         }
-        if (nextTab === 'absen' && currentTab !== 'absen') { 
-            initCamera(); 
-            getLocation(); 
+        if (nextTab === 'absen' && currentTab !== 'absen') {
+            initCamera();
+            getLocation();
             renderKehadiran();
         }
-        
+
         currentTab = nextTab;
         switchTab(currentTab);
-        if(currentTab === 'dashboard') renderDashboard();
-        else if(currentTab === 'rekap') renderRekap();
-        else if(currentTab === 'jurnal') renderJurnal();
+        if (currentTab === 'dashboard') renderDashboard();
+        else if (currentTab === 'rekap') renderRekap();
+        else if (currentTab === 'jurnal') renderJurnal();
     });
 });
 
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(c => { c.classList.add('hidden'); c.classList.remove('flex'); });
     const target = document.getElementById('tab-' + tabId);
-    if(target) { target.classList.remove('hidden'); target.classList.add('flex'); }
+    if (target) { target.classList.remove('hidden'); target.classList.add('flex'); }
 }
 
 // Fetch Data (Rekap & Dashboard)
@@ -185,7 +185,7 @@ async function fetchRekap(nisn) {
         if (result.status === 'success') {
             rekapDataCache = result.data || [];
             pengaturanCache = result.pengaturan || { tglMulai: '', tglSelesai: '', libur: [] };
-            
+
             // Save PSG Location
             userData.psgLat = result.psgLat ? parseFloat(result.psgLat.toString().replace(',', '.')) : null;
             userData.psgLng = result.psgLng ? parseFloat(result.psgLng.toString().replace(',', '.')) : null;
@@ -200,11 +200,11 @@ async function fetchRekap(nisn) {
 
 function isWorkingDay(dateStr) {
     if (!pengaturanCache.tglMulai) return true;
-    let d = parseDate(dateStr); d.setHours(0,0,0,0);
-    let start = parseDate(pengaturanCache.tglMulai); start.setHours(0,0,0,0);
-    let end = pengaturanCache.tglSelesai ? parseDate(pengaturanCache.tglSelesai) : new Date(2100,0,1); end.setHours(23,59,59,999);
-    let now = new Date(); now.setHours(23,59,59,999);
-    
+    let d = parseDate(dateStr); d.setHours(0, 0, 0, 0);
+    let start = parseDate(pengaturanCache.tglMulai); start.setHours(0, 0, 0, 0);
+    let end = pengaturanCache.tglSelesai ? parseDate(pengaturanCache.tglSelesai) : new Date(2100, 0, 1); end.setHours(23, 59, 59, 999);
+    let now = new Date(); now.setHours(23, 59, 59, 999);
+
     if (d < start || d > end || d > now) return false;
     let day = d.getDay();
     if (day === 0 || day === 6) return false;
@@ -215,7 +215,7 @@ function isWorkingDay(dateStr) {
 function renderDashboard() {
     const todayStr = getTodayStr();
     const todayRecord = rekapDataCache.find(r => r.tanggal === todayStr);
-    
+
     const btnCancelAbsen = document.getElementById('btnCancelAbsen');
     if (todayRecord) {
         dashStatusHariIni.innerText = `${todayRecord.status} pukul ${todayRecord.waktu}`;
@@ -254,22 +254,22 @@ function renderDashboard() {
     }
 
     const filter = dashBulanFilter.value;
-    let H=0, S=0, I=0, A=0;
-    
+    let H = 0, S = 0, I = 0, A = 0;
+
     let workingDatesCount = 0;
     if (pengaturanCache.tglMulai) {
         let startD = parseDate(pengaturanCache.tglMulai);
         let endD = pengaturanCache.tglSelesai ? parseDate(pengaturanCache.tglSelesai) : new Date();
         let nowD = new Date();
         if (endD > nowD) endD = nowD;
-        
-        for(let curr = new Date(startD); curr <= endD; curr.setDate(curr.getDate()+1)) {
+
+        for (let curr = new Date(startD); curr <= endD; curr.setDate(curr.getDate() + 1)) {
             if (filter !== 'all' && (curr.getMonth() + 1).toString() !== filter) continue;
-            let currStr = `${curr.getDate().toString().padStart(2,'0')}/${(curr.getMonth()+1).toString().padStart(2,'0')}/${curr.getFullYear()}`;
+            let currStr = `${curr.getDate().toString().padStart(2, '0')}/${(curr.getMonth() + 1).toString().padStart(2, '0')}/${curr.getFullYear()}`;
             if (isWorkingDay(currStr)) workingDatesCount++;
         }
     }
-    
+
     rekapDataCache.forEach(item => {
         const d = parseDate(item.tanggal);
         if (filter === 'all' || (d.getMonth() + 1) == filter) {
@@ -306,7 +306,7 @@ function renderRekap() {
     filtered.forEach(item => {
         let badgeColor = item.status === 'Hadir' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
             item.status === 'Izin' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200';
-            
+
         let fotoUrl = item.foto;
         if (fotoUrl && fotoUrl.includes('drive.google.com/file/d/')) {
             const match = fotoUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -332,19 +332,19 @@ btnExportPdf.addEventListener('click', () => window.print());
 
 function updateSubmitVisibility() {
     const selectedStatus = inputStatus.value;
-    let isAppropriateLocation = true; 
-    
+    let isAppropriateLocation = true;
+
     if (selectedStatus === 'Hadir') {
         if (userData.psgLat && userData.psgLng) {
             if (!userData.lat || !userData.lng) {
-                isAppropriateLocation = false; 
+                isAppropriateLocation = false;
             } else {
                 const d = getDistanceFromLatLonInM(userData.lat, userData.lng, userData.psgLat, userData.psgLng);
                 if (d > 50) isAppropriateLocation = false;
             }
         } else {
             if (!userData.lat || !userData.lng) {
-                isAppropriateLocation = false; 
+                isAppropriateLocation = false;
             }
         }
     }
@@ -388,7 +388,7 @@ function getLocation() {
             clearTimeout(gpsInterval);
             gpsInterval = null;
         }
-        
+
         gpsLoopId++;
         const currentLoopId = gpsLoopId;
 
@@ -396,8 +396,8 @@ function getLocation() {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     if (currentLoopId !== gpsLoopId) return;
-                    
-                    const lat = pos.coords.latitude; 
+
+                    const lat = pos.coords.latitude;
                     const lng = pos.coords.longitude;
                     userData.lat = lat; userData.lng = lng;
 
@@ -434,13 +434,13 @@ function getLocation() {
                     updateSubmitVisibility();
                     gpsInterval = setTimeout(fetchLocation, 2500);
                 },
-                (err) => { 
+                (err) => {
                     if (currentLoopId !== gpsLoopId) return;
-                    
+
                     locDot.classList.remove('bg-amber-500', 'bg-emerald-500', 'bg-rose-500');
-                    locDot.classList.add('bg-rose-500'); 
-                    locText.innerText = "GPS Gagal"; 
-                    updateSubmitVisibility(); 
+                    locDot.classList.add('bg-rose-500');
+                    locText.innerText = "GPS Gagal";
+                    updateSubmitVisibility();
                     gpsInterval = setTimeout(fetchLocation, 2500);
                 },
                 { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -460,10 +460,10 @@ btnCapture.addEventListener('click', () => {
 
     video.classList.add('hidden');
     photoPreview.src = userData.photoBase64; photoPreview.classList.remove('hidden');
-    
+
     btnCapture.classList.add('hidden');
     btnRetake.classList.remove('hidden');
-    
+
     btnSubmit.disabled = false;
     btnSubmit.className = "w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2";
     btnSubmit.innerHTML = `Kirim Absensi Sekarang <i class="ph ph-paper-plane-right font-bold text-lg"></i>`;
@@ -474,7 +474,7 @@ btnRetake.addEventListener('click', () => {
     userData.photoBase64 = null;
     photoPreview.classList.add('hidden'); video.classList.remove('hidden');
     btnRetake.classList.add('hidden'); btnCapture.classList.remove('hidden');
-    
+
     btnSubmit.disabled = true;
     btnSubmit.className = "w-full bg-slate-300 text-slate-500 font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all mt-2";
     btnSubmit.innerHTML = `Silakan Ambil Foto <i class="ph ph-camera text-lg"></i>`;
@@ -491,15 +491,15 @@ function getCurrentWeekRange() {
     const now = new Date();
     const day = now.getDay(); // 0=Sun, 1=Mon...
     const diffToMonday = day === 0 ? -6 : 1 - day;
-    
+
     const monday = new Date(now);
     monday.setDate(now.getDate() + diffToMonday);
     monday.setHours(0, 0, 0, 0);
-    
+
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
-    
+
     return { monday, sunday };
 }
 
@@ -510,41 +510,41 @@ function getWeekId(date) {
     const diffToMonday = day === 0 ? -6 : 1 - day;
     d.setDate(d.getDate() + diffToMonday);
     d.setHours(0, 0, 0, 0);
-    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
 }
 
 function formatDateIndo(date) {
-    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 function handleJurnalFileSelect(input, slotNum) {
     const file = input.files[0];
     if (!file) return;
-    
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showToast("Ukuran file maksimal 5MB!", "error");
-        input.value = '';
-        return;
-    }
-    
+
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         // Compress image
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
             const canvas = document.createElement('canvas');
-            const MAX_W = 800;
+            const MAX_W = 800; // Dinaikkan sedikit agar resolusi tetap bagus untuk laporan
             let w = img.width, h = img.height;
             if (w > MAX_W) { h = h * (MAX_W / w); w = MAX_W; }
             canvas.width = w; canvas.height = h;
             canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            const compressed = canvas.toDataURL('image/jpeg', 0.5);
             
+            // Kompresi dinamis agar ukuran kecil tapi tetap terbaca jelas (kualitas min 0.4)
+            let quality = 0.6;
+            let compressed = canvas.toDataURL('image/jpeg', quality);
+            while (compressed.length > 120000 && quality > 0.4) {
+                quality -= 0.1;
+                compressed = canvas.toDataURL('image/jpeg', quality);
+            }
+
             jurnalPhotos[slotNum - 1] = compressed;
-            
+
             // Update slot UI
             const slot = document.getElementById(`jurnalSlot${slotNum}`);
             const content = document.getElementById(`jurnalSlot${slotNum}Content`);
@@ -570,7 +570,7 @@ function removeJurnalPhoto(slotNum) {
     const slot = document.getElementById(`jurnalSlot${slotNum}`);
     const content = document.getElementById(`jurnalSlot${slotNum}Content`);
     const fileInput = document.getElementById(`jurnalFile${slotNum}`);
-    
+
     slot.classList.remove('has-image');
     content.innerHTML = `
         <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
@@ -586,15 +586,15 @@ function updateJurnalUploadCount() {
     const countEl = document.getElementById('jurnalUploadCount');
     const progressBar = document.getElementById('jurnalProgressBar');
     const progressText = document.getElementById('jurnalProgressText');
-    
+
     let colorClass = 'bg-slate-400';
     let countElBg = 'bg-slate-100';
     let countElText = 'text-slate-500';
-    
+
     if (count === 1) { colorClass = 'bg-amber-400'; countElBg = 'bg-amber-100'; countElText = 'text-amber-600'; }
     else if (count === 2) { colorClass = 'bg-emerald-400'; countElBg = 'bg-emerald-100'; countElText = 'text-emerald-600'; }
     else if (count >= 3) { colorClass = 'bg-rose-500'; countElBg = 'bg-rose-100'; countElText = 'text-rose-600'; }
-    
+
     if (countEl) {
         countEl.innerText = `${count}/2 foto`;
         countEl.className = `text-xs font-bold px-2 py-1 rounded-lg ${countElBg} ${countElText}`;
@@ -608,7 +608,7 @@ function updateJurnalUploadCount() {
     }
 }
 
-window.tambahSlotJurnal = function() {
+window.tambahSlotJurnal = function () {
     if (visibleJurnalSlots < 3) {
         visibleJurnalSlots++;
         const slotEl = document.getElementById(`slotContainer${visibleJurnalSlots}`);
@@ -621,13 +621,13 @@ window.tambahSlotJurnal = function() {
     }
 }
 
-window.editJurnal = function(id) {
+window.editJurnal = function (id) {
     const entry = jurnalDataCache.find(j => j.id === id);
     if (!entry) return;
-    
+
     document.getElementById('jurnalSuccessContainer').classList.add('hidden');
     document.getElementById('jurnalUploadSection').classList.remove('hidden');
-    
+
     let ketParsed = ["", "", ""];
     if (entry.keterangan) {
         const lines = entry.keterangan.split('\n\n');
@@ -638,18 +638,18 @@ window.editJurnal = function(id) {
             else ketParsed[0] += (ketParsed[0] ? "\n" : "") + line;
         }
     }
-    
+
     jurnalPhotos = [null, null, null];
     visibleJurnalSlots = entry.photoUrls.length || 1;
     if (visibleJurnalSlots > 3) visibleJurnalSlots = 3;
-    
+
     for (let i = 1; i <= 3; i++) {
         const slotC = document.getElementById(`slotContainer${i}`);
         if (i <= visibleJurnalSlots) {
             if (slotC) slotC.classList.remove('hidden');
-            const url = entry.photoUrls[i-1];
+            const url = entry.photoUrls[i - 1];
             if (url) {
-                jurnalPhotos[i-1] = url;
+                jurnalPhotos[i - 1] = url;
                 const slot = document.getElementById(`jurnalSlot${i}`);
                 const content = document.getElementById(`jurnalSlot${i}Content`);
                 slot.classList.add('has-image');
@@ -666,19 +666,19 @@ window.editJurnal = function(id) {
         } else {
             if (slotC) slotC.classList.add('hidden');
         }
-        
+
         const ketEl = document.getElementById(`jurnalKeterangan${i}`);
-        if (ketEl) ketEl.value = ketParsed[i-1];
+        if (ketEl) ketEl.value = ketParsed[i - 1];
     }
-    
+
     if (visibleJurnalSlots >= 3) {
         document.getElementById('btnAddSlot').classList.add('hidden');
     } else {
         document.getElementById('btnAddSlot').classList.remove('hidden');
     }
-    
+
     updateJurnalUploadCount();
-    
+
     const btnSubmit = document.getElementById('btnSubmitJurnal');
     btnSubmit.dataset.editId = id;
     btnSubmit.innerHTML = `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan`;
@@ -687,35 +687,35 @@ window.editJurnal = function(id) {
 async function submitJurnal() {
     const photos = [];
     const ketLines = [];
-    
+
     for (let i = 1; i <= visibleJurnalSlots; i++) {
-        let p = jurnalPhotos[i-1];
+        let p = jurnalPhotos[i - 1];
         let ketEl = document.getElementById(`jurnalKeterangan${i}`);
         let ket = ketEl ? ketEl.value.trim() : "";
-        
+
         // If a slot has either a photo or text, require BOTH
         if (p || ket) {
             if (!p) return showToast(`Mohon upload Foto pada slot ${i}!`, "error");
             if (!ket) return showToast(`Mohon isi keterangan untuk Foto pada slot ${i}!`, "error");
-            
+
             photos.push(p);
             ketLines.push(`Foto ${photos.length}: ${ket}`);
         }
     }
-    
+
     if (photos.length === 0) {
         return showToast("Mohon upload setidaknya 1 dokumentasi!", "error");
     }
-    
+
     const keterangan = ketLines.join('\n\n');
-    
+
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
-    
+
     const btn = document.getElementById('btnSubmitJurnal');
     const isEditMode = !!btn.dataset.editId;
     const editId = btn.dataset.editId;
-    
+
     // Check if already submitted this week (only if NOT editing)
     if (!isEditMode) {
         const existingEntry = jurnalDataCache.find(j => j.weekId === weekId);
@@ -723,30 +723,30 @@ async function submitJurnal() {
             return showToast("Jurnal minggu ini sudah dikirim!", "error");
         }
     }
-    
+
     btn.disabled = true;
     btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Menyimpan...`;
     loadingOverlay.classList.remove('hidden');
-    
+
     try {
         const payload = {
             action: isEditMode ? "editJurnal" : "submitJurnal",
             id: isEditMode ? editId : undefined,
             nisn: userData.nisn,
             weekId: weekId,
-            weekStart: `${monday.getDate().toString().padStart(2,'0')}/${(monday.getMonth()+1).toString().padStart(2,'0')}/${monday.getFullYear()}`,
-            weekEnd: `${sunday.getDate().toString().padStart(2,'0')}/${(sunday.getMonth()+1).toString().padStart(2,'0')}/${sunday.getFullYear()}`,
+            weekStart: `${monday.getDate().toString().padStart(2, '0')}/${(monday.getMonth() + 1).toString().padStart(2, '0')}/${monday.getFullYear()}`,
+            weekEnd: `${sunday.getDate().toString().padStart(2, '0')}/${(sunday.getMonth() + 1).toString().padStart(2, '0')}/${sunday.getFullYear()}`,
             keterangan: keterangan,
             photos: photos // Array of base64 strings or URLs
         };
-        
+
         const res = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             body: JSON.stringify(payload),
             headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
         const result = await res.json();
-             if (result.status === 'success') {
+        if (result.status === 'success') {
             showToast(isEditMode ? "Dokumentasi berhasil diperbarui! 🎉" : "Dokumentasi berhasil dikirim! 🎉");
             // Reset form
             jurnalPhotos = [null, null, null];
@@ -754,16 +754,16 @@ async function submitJurnal() {
             for (let i = 1; i <= 3; i++) {
                 removeJurnalPhoto(i);
                 let ketEl = document.getElementById(`jurnalKeterangan${i}`);
-                if(ketEl) ketEl.value = '';
-                if(i > 1) {
+                if (ketEl) ketEl.value = '';
+                if (i > 1) {
                     let slotC = document.getElementById(`slotContainer${i}`);
-                    if(slotC) slotC.classList.add('hidden');
+                    if (slotC) slotC.classList.add('hidden');
                 }
             }
             document.getElementById('btnAddSlot').classList.remove('hidden');
             delete btn.dataset.editId;
             btn.innerHTML = `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
-            
+
             // Refresh data
             fetchJurnal(userData.nisn);
         } else {
@@ -799,22 +799,22 @@ function renderKehadiran() {
     const todayRecord = rekapDataCache.find(r => r.tanggal === todayStr);
     const formContainer = document.getElementById('absenFormContainer');
     const successContainer = document.getElementById('absenSuccessContainer');
-    
+
     if (todayRecord) {
-        if(formContainer) { formContainer.classList.add('hidden'); formContainer.classList.remove('flex'); }
-        if(successContainer) { successContainer.classList.remove('hidden'); successContainer.classList.add('flex'); }
+        if (formContainer) { formContainer.classList.add('hidden'); formContainer.classList.remove('flex'); }
+        if (successContainer) { successContainer.classList.remove('hidden'); successContainer.classList.add('flex'); }
         stopCamera();
         renderAgendaHarian(todayRecord);
     } else {
-        if(formContainer) { formContainer.classList.remove('hidden'); formContainer.classList.add('flex'); }
-        if(successContainer) { successContainer.classList.add('hidden'); successContainer.classList.remove('flex'); }
+        if (formContainer) { formContainer.classList.remove('hidden'); formContainer.classList.add('flex'); }
+        if (successContainer) { successContainer.classList.add('hidden'); successContainer.classList.remove('flex'); }
     }
 }
 
 function renderAgendaHarian(todayRecord) {
     const agendaContent = document.getElementById('agendaContent');
     if (!agendaContent) return;
-    
+
     if (todayRecord.status !== 'Hadir') {
         agendaContent.innerHTML = `<div class="text-center py-4 bg-slate-50 rounded-xl border border-slate-100"><i class="ph ph-info text-2xl text-blue-500 mb-1"></i><p class="text-sm font-medium text-slate-500">Status Anda hari ini: ${todayRecord.status}.<br>Tidak perlu mengisi jurnal harian.</p></div>`;
     } else {
@@ -832,21 +832,21 @@ function renderAgendaHarian(todayRecord) {
 function renderJurnal() {
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
-    
+
     // Update week range display
     const rangeEl = document.getElementById('jurnalWeekRange');
     if (rangeEl) {
         rangeEl.innerText = `${formatDateIndo(monday)} — ${formatDateIndo(sunday)}`;
     }
-    
+
     // Check if current week already submitted
     const currentWeekEntry = jurnalDataCache.find(j => j.weekId === weekId);
     const uploadSection = document.getElementById('jurnalUploadSection');
     const successContainer = document.getElementById('jurnalSuccessContainer');
-    
+
     if (currentWeekEntry) {
-        if(uploadSection) uploadSection.classList.add('hidden');
-        if(successContainer) {
+        if (uploadSection) uploadSection.classList.add('hidden');
+        if (successContainer) {
             successContainer.classList.remove('hidden');
             successContainer.innerHTML = `
                 <div class="text-center py-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -874,28 +874,28 @@ function renderJurnal() {
         if (progressBar) progressBar.style.width = `${(count / 2) * 100}%`;
         if (progressText) progressText.innerText = `${count}/2`;
     } else {
-        if(successContainer) successContainer.classList.add('hidden');
-        if(uploadSection) uploadSection.classList.remove('hidden');
+        if (successContainer) successContainer.classList.add('hidden');
+        if (uploadSection) uploadSection.classList.remove('hidden');
         updateJurnalUploadCount();
     }
-    
+
     // Render history
     const historyContainer = document.getElementById('jurnalHistory');
     if (!jurnalDataCache.length) {
         historyContainer.innerHTML = `<div class="text-center text-slate-400 text-sm py-6 font-medium bg-white rounded-xl border border-slate-200">Belum ada riwayat jurnal.</div>`;
         return;
     }
-    
+
     // Sort by weekId descending (newest first)
     const sorted = [...jurnalDataCache].sort((a, b) => b.weekId.localeCompare(a.weekId));
-    
+
     let html = '';
     sorted.forEach((entry, idx) => {
         const isCurrentWeek = entry.weekId === weekId;
         const photoCount = entry.photoCount || 0;
         const progressPct = Math.round((photoCount / 2) * 100);
         const progressColor = photoCount >= 2 ? 'bg-emerald-500' : 'bg-amber-500';
-        
+
         // Build photo gallery HTML
         let photosHtml = '';
         const photoUrls = entry.photoUrls || [];
@@ -916,9 +916,9 @@ function renderJurnal() {
                 photosHtml += `
                     <div class="relative group">
                         <img src="${thumbUrl}" class="w-full aspect-square object-cover rounded-lg border border-slate-200 bg-slate-100 cursor-pointer" 
-                             onclick="openJurnalImageViewer('${thumbUrl.replace('sz=w300','sz=w1200')}', '${downloadUrl}', 'Foto ${i+1} - Minggu ${entry.weekStart}')" 
+                             onclick="openJurnalImageViewer('${thumbUrl.replace('sz=w300', 'sz=w1200')}', '${downloadUrl}', 'Foto ${i + 1} - Minggu ${entry.weekStart}')" 
                              onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzQ3NTU2OSIgZD0iTTEyIDJDMiAyIDIgMTIgMiAxMnMyIDEwIDEwIDEwIDEwLTEwIDEwLTEwUzIyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6Ii8+PC9zdmc+'" 
-                             alt="Foto ${i+1}">
+                             alt="Foto ${i + 1}">
                         <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 rounded-lg transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                             <i class="ph ph-magnifying-glass-plus text-white text-xl"></i>
                         </div>
@@ -927,7 +927,7 @@ function renderJurnal() {
             });
             photosHtml += `</div>`;
         }
-        
+
         html += `
         <div class="jurnal-card ${isCurrentWeek ? 'ring-2 ring-primary/30' : ''}">
             <div class="p-4">
@@ -935,7 +935,7 @@ function renderJurnal() {
                     <div>
                         <div class="flex items-center gap-2 mb-1">
                             ${isCurrentWeek ? '<span class="text-[10px] bg-primary text-white px-2 py-0.5 rounded-md font-bold uppercase">Minggu Ini</span>' : ''}
-                            <span class="text-[10px] ${progressColor.replace('bg-','text-').replace('500','600')} ${progressColor.replace('500','50')} border ${progressColor.replace('bg-','border-').replace('500','200')} px-2 py-0.5 rounded-md font-bold">${photoCount}/2 Foto</span>
+                            <span class="text-[10px] ${progressColor.replace('bg-', 'text-').replace('500', '600')} ${progressColor.replace('500', '50')} border ${progressColor.replace('bg-', 'border-').replace('500', '200')} px-2 py-0.5 rounded-md font-bold">${photoCount}/2 Foto</span>
                         </div>
                         <p class="text-sm font-bold text-slate-800">${entry.weekStart || ''} — ${entry.weekEnd || ''}</p>
                     </div>
@@ -955,7 +955,7 @@ function renderJurnal() {
             </div>
         </div>`;
     });
-    
+
     historyContainer.innerHTML = html;
 }
 
@@ -964,7 +964,7 @@ function openJurnalImageViewer(imgSrc, downloadUrl, title) {
     // Create modal overlay
     let modal = document.getElementById('jurnalImageModal');
     if (modal) modal.remove();
-    
+
     modal = document.createElement('div');
     modal.id = 'jurnalImageModal';
     modal.className = 'fixed inset-0 z-[200] bg-black/90 flex flex-col items-center justify-center p-4 animate-fadeIn';
@@ -993,21 +993,21 @@ window.removeJurnalPhoto = removeJurnalPhoto;
 window.submitJurnal = submitJurnal;
 window.openJurnalImageViewer = openJurnalImageViewer;
 
-window.submitAgendaHarian = async function() {
+window.submitAgendaHarian = async function () {
     const inputEl = document.getElementById('inputAgendaHarianBaru');
-    if(!inputEl) return;
+    if (!inputEl) return;
     const agendaText = inputEl.value.trim();
     if (!agendaText) return showToast("Mohon isi deskripsi kegiatan hari ini!", "error");
-    
+
     const btn = document.getElementById('btnSubmitAgenda');
     btn.disabled = true;
     btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Menyimpan...`;
-    
+
     try {
         const payload = { action: "submitAgendaHarian", nisn: userData.nisn, agenda: agendaText };
         const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
         const result = await res.json();
-        
+
         if (result.status === 'success') {
             showToast("Jurnal Harian berhasil disimpan! 🎉");
             fetchRekap(userData.nisn); // Reload all data
@@ -1023,15 +1023,15 @@ window.submitAgendaHarian = async function() {
     }
 }
 
-window.deleteAbsenHariIni = async function() {
-    if(!confirm("Apakah Anda yakin ingin membatalkan (menghapus) absen hari ini?")) return;
-    
+window.deleteAbsenHariIni = async function () {
+    if (!confirm("Apakah Anda yakin ingin membatalkan (menghapus) absen hari ini?")) return;
+
     loadingOverlay.classList.remove('hidden');
     try {
         const payload = { action: "deleteAbsen", nisn: userData.nisn };
         const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
         const result = await res.json();
-        
+
         if (result.status === 'success') {
             showToast("Absen hari ini berhasil dibatalkan!");
             fetchRekap(userData.nisn); // Reload data
@@ -1045,15 +1045,15 @@ window.deleteAbsenHariIni = async function() {
     }
 }
 
-window.deleteJurnal = async function(id) {
-    if(!confirm("Apakah Anda yakin ingin menghapus jurnal ini? Anda dapat mengupload ulang setelah dihapus.")) return;
-    
+window.deleteJurnal = async function (id) {
+    if (!confirm("Apakah Anda yakin ingin menghapus jurnal ini? Anda dapat mengupload ulang setelah dihapus.")) return;
+
     loadingOverlay.classList.remove('hidden');
     try {
         const payload = { action: "deleteJurnal", id: id, nisn: userData.nisn };
         const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
         const result = await res.json();
-        
+
         if (result.status === 'success') {
             showToast("Jurnal berhasil dihapus!");
             // Reset state jurnal upload UI jika menghapus jurnal minggu ini
@@ -1127,9 +1127,9 @@ btnSubmit.addEventListener('click', async () => {
     const alasan = inputAlasan.value.trim();
 
     if (selectedStatus === 'Hadir') {
-        
+
         if (!userData.lat || !userData.lng) return showToast("Lokasi GPS belum didapatkan.", "error");
-        
+
         // Cek pengumpulan sampel GPS
         if (gpsHistory.length < 3) {
             return showToast("Mengkalibrasi sinyal GPS, mohon tunggu beberapa detik...", "error");
@@ -1151,16 +1151,16 @@ btnSubmit.addEventListener('click', async () => {
     if ((selectedStatus === 'Sakit' || selectedStatus === 'Izin') && !alasan) return showToast("Mohon tulis alasan Anda!", "error");
 
     loadingOverlay.classList.remove('hidden');
-    
+
     try {
         const payload = { action: "absen", nisn: userData.nisn, lat: userData.lat, lng: userData.lng, status: selectedStatus, alasan: alasan, agenda: "", photoBase64: userData.photoBase64, gpsHistory: gpsHistory };
-        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' }});
+        const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
         const result = await res.json();
-        
+
         if (result.status === 'success') {
             showToast("Berhasil Absen!");
             fetchRekap(userData.nisn); // Update data
-            
+
             // Reset state absen
             inputStatus.value = 'Hadir';
             inputAlasan.value = '';
