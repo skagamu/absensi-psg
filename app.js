@@ -75,9 +75,6 @@ function deg2rad(deg) { return deg * (Math.PI / 180); }
 
 // Init
 window.onload = () => {
-    // Inisialisasi slot jurnal dinamis (1 slot awal)
-    resetJurnalSlots();
-
     const savedNisn = localStorage.getItem('nisn_pkl');
     const savedNama = localStorage.getItem('nama_pkl');
     if (savedNisn) {
@@ -485,15 +482,9 @@ btnRetake.addEventListener('click', () => {
 });
 
 // ===== JURNAL MINGGUAN LOGIC =====
-// Struktur dinamis: setiap elemen = { file: File|null, objectUrl: string|null, existingUrl: string|null }
-// - file: File object dari input (untuk kompresi saat submit)
-// - objectUrl: URL.createObjectURL(file) untuk preview (direvoke saat slot dihapus)
-// - existingUrl: URL Drive lama saat mode edit (tidak perlu dikompres ulang)
-let jurnalPhotos = []; // tidak ada batas maksimal
+let jurnalPhotos = [null, null, null]; // base64 data for 3 slots
+let visibleJurnalSlots = 1;
 let jurnalDataCache = []; // cached jurnal entries from server
-
-// Counter untuk ID slot unik (slot bisa ditambah tanpa batas)
-let jurnalSlotCounter = 0;
 
 // Get current week's Monday and Sunday (Mon 00:00 - Sun 23:59)
 function getCurrentWeekRange() {
@@ -528,104 +519,70 @@ function formatDateIndo(date) {
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-// Buat DOM untuk satu slot jurnal baru, append ke #jurnalPhotoSlots
-// Mengembalikan slotIndex (index di jurnalPhotos[])
-function createJurnalSlot(label) {
-    const idx = jurnalPhotos.length; // index baru
-    jurnalPhotos.push({ file: null, objectUrl: null, existingUrl: null });
-    jurnalSlotCounter++;
-    const slotNum = jurnalSlotCounter;
-    const slotLabel = label || `Foto ${idx + 1}`;
-
-    const container = document.createElement('div');
-    container.id = `slotContainer_${slotNum}`;
-    container.dataset.idx = idx;
-    container.innerHTML = `
-        <div class="jurnal-upload-box" id="jurnalSlot_${slotNum}" onclick="document.getElementById('jurnalFile_${slotNum}').click()">
-            <input type="file" id="jurnalFile_${slotNum}" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, ${slotNum}, ${idx})">
-            <div id="jurnalSlot_${slotNum}Content">
-                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-                <p class="text-sm font-semibold text-slate-500">${slotLabel}</p>
-                <p class="text-xs text-slate-400">Tap untuk upload</p>
-            </div>
-        </div>
-        <textarea id="jurnalKeterangan_${slotNum}" placeholder="Keterangan ${slotLabel.toLowerCase()}..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
-    `;
-    document.getElementById('jurnalPhotoSlots').insertBefore(container, document.getElementById('btnAddSlot'));
-    return { slotNum, idx };
-}
-
-// Reset seluruh slot jurnal (hapus semua DOM slot, revoke semua ObjectURL)
-function resetJurnalSlots() {
-    // Revoke semua ObjectURL agar tidak memory leak
-    jurnalPhotos.forEach(p => { if (p && p.objectUrl) URL.revokeObjectURL(p.objectUrl); });
-    jurnalPhotos = [];
-    jurnalSlotCounter = 0;
-
-    // Hapus semua slot dari DOM
-    const slotsEl = document.getElementById('jurnalPhotoSlots');
-    if (!slotsEl) return;
-    // Hapus semua child kecuali btnAddSlot
-    const btnAdd = document.getElementById('btnAddSlot');
-    while (slotsEl.firstChild && slotsEl.firstChild !== btnAdd) {
-        slotsEl.removeChild(slotsEl.firstChild);
-    }
-
-    // Buat 1 slot awal
-    createJurnalSlot('Foto 1');
-    updateJurnalUploadCount();
-}
-// Opsi 2: Simpan File + ObjectURL saja. Kompresi dilakukan saat submit.
-function handleJurnalFileSelect(input, slotNum, idx) {
+function handleJurnalFileSelect(input, slotNum) {
     const file = input.files[0];
     if (!file) return;
 
-    // Revoke ObjectURL lama jika ada
-    if (jurnalPhotos[idx] && jurnalPhotos[idx].objectUrl) {
-        URL.revokeObjectURL(jurnalPhotos[idx].objectUrl);
-    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        // Compress image
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            const MAX_W = 800; // Dinaikkan sedikit agar resolusi tetap bagus untuk laporan
+            let w = img.width, h = img.height;
+            if (w > MAX_W) { h = h * (MAX_W / w); w = MAX_W; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            
+            // Kompresi dinamis agar ukuran kecil tapi tetap terbaca jelas (kualitas min 0.4)
+            let quality = 0.6;
+            let compressed = canvas.toDataURL('image/jpeg', quality);
+            while (compressed.length > 120000 && quality > 0.4) {
+                quality -= 0.1;
+                compressed = canvas.toDataURL('image/jpeg', quality);
+            }
 
-    const objectUrl = URL.createObjectURL(file);
-    jurnalPhotos[idx] = { file, objectUrl, existingUrl: null };
+            jurnalPhotos[slotNum - 1] = compressed;
 
-    const slot = document.getElementById(`jurnalSlot_${slotNum}`);
-    const content = document.getElementById(`jurnalSlot_${slotNum}Content`);
-    const slotLabel = `Foto ${idx + 1}`;
-    slot.classList.add('has-image');
-    content.innerHTML = `
-        <img src="${objectUrl}" class="jurnal-img-preview" alt="${slotLabel}">
-        <div class="flex items-center justify-between mt-2 px-1">
-            <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> ${slotLabel}</span>
-            <button onclick="event.stopPropagation(); removeJurnalPhoto(${slotNum}, ${idx})" class="text-xs text-rose-500 font-semibold hover:text-rose-700 flex items-center gap-1">
-                <i class="ph ph-trash"></i> Hapus
-            </button>
-        </div>
-    `;
-    updateJurnalUploadCount();
+            // Update slot UI
+            const slot = document.getElementById(`jurnalSlot${slotNum}`);
+            const content = document.getElementById(`jurnalSlot${slotNum}Content`);
+            slot.classList.add('has-image');
+            content.innerHTML = `
+                <img src="${compressed}" class="jurnal-img-preview" alt="Foto ${slotNum}">
+                <div class="flex items-center justify-between mt-2 px-1">
+                    <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Foto ${slotNum}</span>
+                    <button onclick="event.stopPropagation(); removeJurnalPhoto(${slotNum})" class="text-xs text-rose-500 font-semibold hover:text-rose-700 flex items-center gap-1">
+                        <i class="ph ph-trash"></i> Hapus
+                    </button>
+                </div>
+            `;
+            updateJurnalUploadCount();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
-function removeJurnalPhoto(slotNum, idx) {
-    if (jurnalPhotos[idx]) {
-        if (jurnalPhotos[idx].objectUrl) URL.revokeObjectURL(jurnalPhotos[idx].objectUrl);
-        jurnalPhotos[idx] = { file: null, objectUrl: null, existingUrl: null };
-    }
-    const slot = document.getElementById(`jurnalSlot_${slotNum}`);
-    const content = document.getElementById(`jurnalSlot_${slotNum}Content`);
-    const fileInput = document.getElementById(`jurnalFile_${slotNum}`);
-    const slotLabel = `Foto ${idx + 1}`;
+function removeJurnalPhoto(slotNum) {
+    jurnalPhotos[slotNum - 1] = null;
+    const slot = document.getElementById(`jurnalSlot${slotNum}`);
+    const content = document.getElementById(`jurnalSlot${slotNum}Content`);
+    const fileInput = document.getElementById(`jurnalFile${slotNum}`);
 
     slot.classList.remove('has-image');
     content.innerHTML = `
         <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
-        <p class="text-sm font-semibold text-slate-500">${slotLabel}</p>
+        <p class="text-sm font-semibold text-slate-500">Foto ${slotNum}</p>
         <p class="text-xs text-slate-400">Tap untuk upload</p>
     `;
-    if (fileInput) fileInput.value = '';
+    fileInput.value = '';
     updateJurnalUploadCount();
 }
 
 function updateJurnalUploadCount() {
-    const count = jurnalPhotos.filter(p => p && (p.file || p.existingUrl)).length;
+    const count = jurnalPhotos.filter(p => p !== null).length;
     const countEl = document.getElementById('jurnalUploadCount');
     const progressBar = document.getElementById('jurnalProgressBar');
     const progressText = document.getElementById('jurnalProgressText');
@@ -635,10 +592,11 @@ function updateJurnalUploadCount() {
     let countElText = 'text-slate-500';
 
     if (count === 1) { colorClass = 'bg-amber-400'; countElBg = 'bg-amber-100'; countElText = 'text-amber-600'; }
-    else if (count >= 2) { colorClass = 'bg-emerald-400'; countElBg = 'bg-emerald-100'; countElText = 'text-emerald-600'; }
+    else if (count === 2) { colorClass = 'bg-emerald-400'; countElBg = 'bg-emerald-100'; countElText = 'text-emerald-600'; }
+    else if (count >= 3) { colorClass = 'bg-rose-500'; countElBg = 'bg-rose-100'; countElText = 'text-rose-600'; }
 
     if (countEl) {
-        countEl.innerText = `${count} foto`;
+        countEl.innerText = `${count}/2 foto`;
         countEl.className = `text-xs font-bold px-2 py-1 rounded-lg ${countElBg} ${countElText}`;
     }
     if (progressBar) {
@@ -650,13 +608,19 @@ function updateJurnalUploadCount() {
     }
 }
 
-// Tambah slot baru tanpa batas
 window.tambahSlotJurnal = function () {
-    createJurnalSlot(`Foto ${jurnalPhotos.length + 1}`);
-    updateJurnalUploadCount();
+    if (visibleJurnalSlots < 3) {
+        visibleJurnalSlots++;
+        const slotEl = document.getElementById(`slotContainer${visibleJurnalSlots}`);
+        if (slotEl) {
+            slotEl.classList.remove('hidden');
+        }
+        if (visibleJurnalSlots >= 3) {
+            document.getElementById('btnAddSlot').classList.add('hidden');
+        }
+    }
 }
 
-// editJurnal: reset ke slot dinamis, isi dengan data lama dari server
 window.editJurnal = function (id) {
     const entry = jurnalDataCache.find(j => j.id === id);
     if (!entry) return;
@@ -664,61 +628,54 @@ window.editJurnal = function (id) {
     document.getElementById('jurnalSuccessContainer').classList.add('hidden');
     document.getElementById('jurnalUploadSection').classList.remove('hidden');
 
-    // Parse keterangan per foto
-    const ketParsed = [];
+    let ketParsed = ["", "", ""];
     if (entry.keterangan) {
         const lines = entry.keterangan.split('\n\n');
         for (let line of lines) {
-            const m = line.match(/^Foto (\d+): ([\s\S]*)/);
-            if (m) {
-                const fotoIdx = parseInt(m[1]) - 1;
-                ketParsed[fotoIdx] = m[2];
-            } else {
-                // fallback: teks tanpa prefix masuk ke slot pertama
-                if (!ketParsed[0]) ketParsed[0] = line;
+            if (line.startsWith('Foto 1: ')) ketParsed[0] = line.substring(8);
+            else if (line.startsWith('Foto 2: ')) ketParsed[1] = line.substring(8);
+            else if (line.startsWith('Foto 3: ')) ketParsed[2] = line.substring(8);
+            else ketParsed[0] += (ketParsed[0] ? "\n" : "") + line;
+        }
+    }
+
+    jurnalPhotos = [null, null, null];
+    visibleJurnalSlots = entry.photoUrls.length || 1;
+    if (visibleJurnalSlots > 3) visibleJurnalSlots = 3;
+
+    for (let i = 1; i <= 3; i++) {
+        const slotC = document.getElementById(`slotContainer${i}`);
+        if (i <= visibleJurnalSlots) {
+            if (slotC) slotC.classList.remove('hidden');
+            const url = entry.photoUrls[i - 1];
+            if (url) {
+                jurnalPhotos[i - 1] = url;
+                const slot = document.getElementById(`jurnalSlot${i}`);
+                const content = document.getElementById(`jurnalSlot${i}Content`);
+                slot.classList.add('has-image');
+                content.innerHTML = `
+                    <img src="${url}" class="jurnal-img-preview" alt="Foto ${i}">
+                    <div class="flex items-center justify-between mt-2 px-1">
+                        <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Foto Lama</span>
+                        <button onclick="event.stopPropagation(); removeJurnalPhoto(${i})" class="text-xs text-rose-500 font-semibold hover:text-rose-700 flex items-center gap-1">
+                            <i class="ph ph-trash"></i> Hapus
+                        </button>
+                    </div>
+                `;
             }
-        }
-    }
-
-    // Reset semua slot, lalu buat ulang sesuai jumlah foto lama
-    resetJurnalSlots(); // buat 1 slot kosong dulu
-    const photoUrls = entry.photoUrls || [];
-    const totalSlots = Math.max(photoUrls.length, 1);
-
-    // Slot pertama sudah dibuat oleh resetJurnalSlots, buat sisanya
-    for (let i = 1; i < totalSlots; i++) {
-        createJurnalSlot(`Foto ${i + 1}`);
-    }
-
-    // Isi setiap slot dengan foto lama (existingUrl) dan keterangan
-    // Ambil semua slotContainer yang ada dari DOM (urut sesuai idx)
-    const slotsEl = document.getElementById('jurnalPhotoSlots');
-    const slotContainers = [...slotsEl.querySelectorAll('[id^="slotContainer_"]')];
-
-    slotContainers.forEach((container, i) => {
-        const slotNum = parseInt(container.id.replace('slotContainer_', ''));
-        const url = photoUrls[i];
-        const ket = ketParsed[i] || '';
-
-        if (url) {
-            jurnalPhotos[i] = { file: null, objectUrl: null, existingUrl: url };
-            const slot = document.getElementById(`jurnalSlot_${slotNum}`);
-            const content = document.getElementById(`jurnalSlot_${slotNum}Content`);
-            slot.classList.add('has-image');
-            content.innerHTML = `
-                <img src="${url}" class="jurnal-img-preview" alt="Foto ${i + 1}">
-                <div class="flex items-center justify-between mt-2 px-1">
-                    <span class="text-xs font-semibold text-emerald-600 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Foto Lama</span>
-                    <button onclick="event.stopPropagation(); removeJurnalPhoto(${slotNum}, ${i})" class="text-xs text-rose-500 font-semibold hover:text-rose-700 flex items-center gap-1">
-                        <i class="ph ph-trash"></i> Hapus
-                    </button>
-                </div>
-            `;
+        } else {
+            if (slotC) slotC.classList.add('hidden');
         }
 
-        const ketEl = document.getElementById(`jurnalKeterangan_${slotNum}`);
-        if (ketEl) ketEl.value = ket;
-    });
+        const ketEl = document.getElementById(`jurnalKeterangan${i}`);
+        if (ketEl) ketEl.value = ketParsed[i - 1];
+    }
+
+    if (visibleJurnalSlots >= 3) {
+        document.getElementById('btnAddSlot').classList.add('hidden');
+    } else {
+        document.getElementById('btnAddSlot').classList.remove('hidden');
+    }
 
     updateJurnalUploadCount();
 
@@ -727,67 +684,44 @@ window.editJurnal = function (id) {
     btnSubmit.innerHTML = `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan`;
 };
 
-// Helper: kompresi satu File object → Promise<base64 string>
-function compressImageFile(file) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_W = 800;
-                let w = img.width, h = img.height;
-                if (w > MAX_W) { h = Math.round(h * (MAX_W / w)); w = MAX_W; }
-                canvas.width = w; canvas.height = h;
-                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                let quality = 0.6;
-                let compressed = canvas.toDataURL('image/jpeg', quality);
-                while (compressed.length > 120000 && quality > 0.4) {
-                    quality -= 0.1;
-                    compressed = canvas.toDataURL('image/jpeg', quality);
-                }
-                resolve(compressed);
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
 async function submitJurnal() {
-    // Kumpulkan slot yang terisi (ada file baru ATAU existingUrl)
-    const slotsEl = document.getElementById('jurnalPhotoSlots');
-    const slotContainers = [...slotsEl.querySelectorAll('[id^="slotContainer_"]')];
+    const photos = [];
+    const ketLines = [];
 
-    const validSlots = []; // { idx, slotNum, photo, ket }
-    for (const container of slotContainers) {
-        const idx = parseInt(container.dataset.idx);
-        const slotNum = parseInt(container.id.replace('slotContainer_', ''));
-        const photo = jurnalPhotos[idx];
-        const ketEl = document.getElementById(`jurnalKeterangan_${slotNum}`);
-        const ket = ketEl ? ketEl.value.trim() : '';
-        const hasPhoto = photo && (photo.file || photo.existingUrl);
+    for (let i = 1; i <= visibleJurnalSlots; i++) {
+        let p = jurnalPhotos[i - 1];
+        let ketEl = document.getElementById(`jurnalKeterangan${i}`);
+        let ket = ketEl ? ketEl.value.trim() : "";
 
-        if (hasPhoto || ket) {
-            if (!hasPhoto) return showToast(`Mohon upload foto pada slot ${idx + 1}!`, 'error');
-            if (!ket) return showToast(`Mohon isi keterangan untuk slot ${idx + 1}!`, 'error');
-            validSlots.push({ idx, slotNum, photo, ket });
+        // If a slot has either a photo or text, require BOTH
+        if (p || ket) {
+            if (!p) return showToast(`Mohon upload Foto pada slot ${i}!`, "error");
+            if (!ket) return showToast(`Mohon isi keterangan untuk Foto pada slot ${i}!`, "error");
+
+            photos.push(p);
+            ketLines.push(`Foto ${photos.length}: ${ket}`);
         }
     }
 
-    if (validSlots.length === 0) {
-        return showToast('Mohon upload setidaknya 1 dokumentasi!', 'error');
+    if (photos.length === 0) {
+        return showToast("Mohon upload setidaknya 1 dokumentasi!", "error");
     }
+
+    const keterangan = ketLines.join('\n\n');
 
     const { monday, sunday } = getCurrentWeekRange();
     const weekId = getWeekId(new Date());
+
     const btn = document.getElementById('btnSubmitJurnal');
     const isEditMode = !!btn.dataset.editId;
     const editId = btn.dataset.editId;
 
+    // Check if already submitted this week (only if NOT editing)
     if (!isEditMode) {
         const existingEntry = jurnalDataCache.find(j => j.weekId === weekId);
-        if (existingEntry) return showToast('Jurnal minggu ini sudah dikirim!', 'error');
+        if (existingEntry) {
+            return showToast("Jurnal minggu ini sudah dikirim!", "error");
+        }
     }
 
     btn.disabled = true;
@@ -795,107 +729,54 @@ async function submitJurnal() {
     loadingOverlay.classList.remove('hidden');
 
     try {
-        // Susun keterangan gabungan
-        const ketLines = validSlots.map((s, i) => `Foto ${i + 1}: ${s.ket}`);
-        const keterangan = ketLines.join('\n\n');
-
-        const weekStart = `${monday.getDate().toString().padStart(2, '0')}/${(monday.getMonth() + 1).toString().padStart(2, '0')}/${monday.getFullYear()}`;
-        const weekEnd = `${sunday.getDate().toString().padStart(2, '0')}/${(sunday.getMonth() + 1).toString().padStart(2, '0')}/${sunday.getFullYear()}`;
-
-        // ──────────────────────────────────────────────────────────────────────────
-        // OPSI 1 – PENGIRIMAN SEKUENSIAL
-        // Request 1: kirim data teks dulu (tanpa foto). Backend membuat/update baris
-        //            jurnal dan mengembalikan `id` entri yang baru dibuat/diupdate.
-        // Request 2..N: kirim setiap foto SATU PER SATU ke URL yang sama dengan
-        //               action "appendJurnalPhoto". Backend HARUS mendukung mode ini:
-        //               ia menerima satu base64 per request dan meng-append foto ke
-        //               baris yang sudah ada (berdasarkan `id` yang dikembalikan oleh
-        //               request pertama).
-        //
-        // ⚠️  PERINGATAN UNTUK BACKEND (Google Apps Script):
-        //     - Action "submitJurnal" / "editJurnal" sekarang TIDAK menerima array
-        //       `photos` lagi. Ia hanya menerima data teks dan mengembalikan `id`.
-        //     - Tambahkan action baru "appendJurnalPhoto" yang menerima:
-        //         { action: "appendJurnalPhoto", id, nisn, photoBase64, photoIndex }
-        //       dan meng-append foto ke kolom/folder yang sesuai.
-        //     - Jika sebelumnya kode GAS mengambil photos[0], photos[1], dst dari
-        //       satu payload, logika itu harus diubah agar mendukung append per item.
-        // ──────────────────────────────────────────────────────────────────────────
-
-        // Request 1: kirim teks dulu
-        const textPayload = {
-            action: isEditMode ? 'editJurnal' : 'submitJurnal',
+        const payload = {
+            action: isEditMode ? "editJurnal" : "submitJurnal",
             id: isEditMode ? editId : undefined,
             nisn: userData.nisn,
-            weekId,
-            weekStart,
-            weekEnd,
-            keterangan,
-            photoCount: validSlots.length // beri tahu backend berapa foto yang akan datang
+            weekId: weekId,
+            weekStart: `${monday.getDate().toString().padStart(2, '0')}/${(monday.getMonth() + 1).toString().padStart(2, '0')}/${monday.getFullYear()}`,
+            weekEnd: `${sunday.getDate().toString().padStart(2, '0')}/${(sunday.getMonth() + 1).toString().padStart(2, '0')}/${sunday.getFullYear()}`,
+            keterangan: keterangan,
+            photos: photos // Array of base64 strings or URLs
         };
 
-        const res1 = await fetch(GOOGLE_SCRIPT_URL, {
+        const res = await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
-            body: JSON.stringify(textPayload),
+            body: JSON.stringify(payload),
             headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
-        const result1 = await res1.json();
-        if (result1.status !== 'success') {
-            showToast(result1.message, 'error');
+        const result = await res.json();
+        if (result.status === 'success') {
+            showToast(isEditMode ? "Dokumentasi berhasil diperbarui! 🎉" : "Dokumentasi berhasil dikirim! 🎉");
+            // Reset form
+            jurnalPhotos = [null, null, null];
+            visibleJurnalSlots = 1;
+            for (let i = 1; i <= 3; i++) {
+                removeJurnalPhoto(i);
+                let ketEl = document.getElementById(`jurnalKeterangan${i}`);
+                if (ketEl) ketEl.value = '';
+                if (i > 1) {
+                    let slotC = document.getElementById(`slotContainer${i}`);
+                    if (slotC) slotC.classList.add('hidden');
+                }
+            }
+            document.getElementById('btnAddSlot').classList.remove('hidden');
+            delete btn.dataset.editId;
+            btn.innerHTML = `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
+
+            // Refresh data
+            fetchJurnal(userData.nisn);
+        } else {
+            showToast(result.message, "error");
             btn.disabled = false;
             btn.innerHTML = isEditMode ? `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan` : `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
-            return;
         }
-
-        const jurналId = result1.id || editId; // backend HARUS kembalikan id entri
-
-        // Request 2..N: kirim foto satu per satu (sekuensial)
-        for (let i = 0; i < validSlots.length; i++) {
-            const s = validSlots[i];
-            btn.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></div> Mengirim foto ${i + 1}/${validSlots.length}...`;
-
-            let base64 = null;
-            if (s.photo.file) {
-                // File baru: kompres dulu saat ini (Opsi 2 – lazy compression)
-                base64 = await compressImageFile(s.photo.file);
-            } else if (s.photo.existingUrl) {
-                // Foto lama (tidak berubah): kirim URL saja, backend skip upload
-                base64 = null; // atau kirim existingUrl sebagai `existingUrl`
-            }
-
-            const photoPayload = {
-                action: 'appendJurnalPhoto',
-                id: jurналId,
-                nisn: userData.nisn,
-                photoIndex: i,            // 0-based index urutan foto
-                photoBase64: base64,      // null jika foto lama tidak berubah
-                existingUrl: s.photo.existingUrl || null
-            };
-
-            const resPhoto = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(photoPayload),
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-            });
-            const resultPhoto = await resPhoto.json();
-            if (resultPhoto.status !== 'success') {
-                showToast(`Gagal mengirim foto ${i + 1}: ${resultPhoto.message}`, 'error');
-                // Lanjutkan ke foto berikutnya (partial upload), jangan abort
-            }
-        }
-
-        showToast(isEditMode ? 'Dokumentasi berhasil diperbarui! 🎉' : 'Dokumentasi berhasil dikirim! 🎉');
-        resetJurnalSlots();
-        delete btn.dataset.editId;
-        btn.innerHTML = `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
-        fetchJurnal(userData.nisn);
     } catch (e) {
-        showToast('Koneksi gagal. Coba lagi.', 'error');
+        showToast("Koneksi gagal. Coba lagi.", "error");
         btn.disabled = false;
         btn.innerHTML = isEditMode ? `<i class="ph ph-pencil-simple text-lg font-bold"></i> Simpan Perubahan` : `<i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan`;
     } finally {
         loadingOverlay.classList.add('hidden');
-        btn.disabled = false;
     }
 }
 
@@ -1175,8 +1056,61 @@ window.deleteJurnal = async function (id) {
 
         if (result.status === 'success') {
             showToast("Jurnal berhasil dihapus!");
-            // Reset slot jurnal ke kondisi awal (1 slot kosong, dinamis)
-            resetJurnalSlots();
+            // Reset state jurnal upload UI jika menghapus jurnal minggu ini
+            document.getElementById('jurnalUploadSection').innerHTML = `
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <i class="ph ph-camera-plus text-primary text-lg"></i> Upload Dokumentasi
+                    </h3>
+                    <span id="jurnalUploadCount" class="text-xs font-bold text-primary bg-blue-50 px-2 py-1 rounded-lg">0/2 foto</span>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4" id="jurnalPhotoSlots">
+                    <div id="slotContainer1">
+                        <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
+                            <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
+                            <div id="jurnalSlot1Content">
+                                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                <p class="text-sm font-semibold text-slate-500">Foto 1</p>
+                                <p class="text-xs text-slate-400">Tap untuk upload</p>
+                            </div>
+                        </div>
+                        <textarea id="jurnalKeterangan1" placeholder="Keterangan foto 1..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                    </div>
+                    <div id="slotContainer2" class="hidden">
+                        <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
+                            <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
+                            <div id="jurnalSlot2Content">
+                                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                <p class="text-sm font-semibold text-slate-500">Foto 2 (Rekomendasi)</p>
+                                <p class="text-xs text-slate-400">Tap untuk upload</p>
+                            </div>
+                        </div>
+                        <textarea id="jurnalKeterangan2" placeholder="Keterangan foto 2..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                    </div>
+                    <div id="slotContainer3" class="hidden">
+                        <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
+                            <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
+                            <div id="jurnalSlot3Content">
+                                <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                <p class="text-sm font-semibold text-slate-500">Foto 3 (Opsional)</p>
+                                <p class="text-xs text-slate-400">Tap untuk upload</p>
+                            </div>
+                        </div>
+                        <textarea id="jurnalKeterangan3" placeholder="Keterangan foto 3..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                    </div>
+                    
+                    <button id="btnAddSlot" onclick="tambahSlotJurnal()" class="w-full border-2 border-dashed border-slate-200 text-slate-500 hover:text-primary hover:border-primary hover:bg-blue-50 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i class="ph ph-plus-circle text-lg"></i> Tambah Dokumentasi
+                    </button>
+                </div>
+
+                <button id="btnSubmitJurnal" onclick="submitJurnal()" class="w-full bg-primary hover:bg-blue-900 active:scale-95 text-white font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2 transition-all shadow-sm mt-2">
+                    <i class="ph ph-paper-plane-right text-lg font-bold"></i> Kirim Dokumentasi Mingguan
+                </button>
+            `;
+            jurnalPhotos = [null, null, null];
+            visibleJurnalSlots = 1;
             fetchJurnal(userData.nisn);
         } else {
             showToast(result.message, "error");
@@ -1204,10 +1138,7 @@ btnSubmit.addEventListener('click', async () => {
         // Fake GPS Protection: Silent treatment jika tidak ada fluktuasi sama sekali (statis)
         const first = gpsHistory[0];
         const isStatic = gpsHistory.every(p => p.lat === first.lat && p.lng === first.lng);
-        if (isStatic) {
-            showToast("Lokasi terlalu statis. Silakan gerakkan sedikit atau pastikan GPS Anda akurat.", "error");
-            return;
-        }
+        if (isStatic) return; // Silent treatment: Do nothing
 
         if (userData.psgLat && userData.psgLng) {
             const d = getDistanceFromLatLonInM(userData.lat, userData.lng, userData.psgLat, userData.psgLng);

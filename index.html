@@ -393,8 +393,43 @@
                             
                             <!-- Photo Upload Slots -->
                             <div class="grid grid-cols-1 gap-4" id="jurnalPhotoSlots">
-                                <!-- Slot foto dibuat dinamis oleh resetJurnalSlots() di app.js -->
-                                <!-- Tombol tambah slot -->
+                                <!-- Slot 1 -->
+                                <div id="slotContainer1">
+                                    <div class="jurnal-upload-box" id="jurnalSlot1" onclick="document.getElementById('jurnalFile1').click()">
+                                        <input type="file" id="jurnalFile1" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 1)">
+                                        <div id="jurnalSlot1Content">
+                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                            <p class="text-sm font-semibold text-slate-500">Foto 1</p>
+                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                                        </div>
+                                    </div>
+                                    <textarea id="jurnalKeterangan1" placeholder="Keterangan foto 1..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                                </div>
+                                <!-- Slot 2 -->
+                                <div id="slotContainer2" class="hidden">
+                                    <div class="jurnal-upload-box" id="jurnalSlot2" onclick="document.getElementById('jurnalFile2').click()">
+                                        <input type="file" id="jurnalFile2" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 2)">
+                                        <div id="jurnalSlot2Content">
+                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                            <p class="text-sm font-semibold text-slate-500">Foto 2 (Rekomendasi)</p>
+                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                                        </div>
+                                    </div>
+                                    <textarea id="jurnalKeterangan2" placeholder="Keterangan foto 2..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                                </div>
+                                <!-- Slot 3 -->
+                                <div id="slotContainer3" class="hidden">
+                                    <div class="jurnal-upload-box" id="jurnalSlot3" onclick="document.getElementById('jurnalFile3').click()">
+                                        <input type="file" id="jurnalFile3" accept="image/*" class="hidden" onchange="handleJurnalFileSelect(this, 3)">
+                                        <div id="jurnalSlot3Content">
+                                            <i class="ph ph-image-square text-3xl text-slate-400 mb-1"></i>
+                                            <p class="text-sm font-semibold text-slate-500">Foto 3 (Opsional)</p>
+                                            <p class="text-xs text-slate-400">Tap untuk upload</p>
+                                        </div>
+                                    </div>
+                                    <textarea id="jurnalKeterangan3" placeholder="Keterangan foto 3..." class="w-full mt-2 bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary focus:bg-white transition-all resize-none h-16"></textarea>
+                                </div>
+                                
                                 <button id="btnAddSlot" onclick="tambahSlotJurnal()" class="w-full border-2 border-dashed border-slate-200 text-slate-500 hover:text-primary hover:border-primary hover:bg-blue-50 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all">
                                     <i class="ph ph-plus-circle text-lg"></i> Tambah Dokumentasi
                                 </button>
